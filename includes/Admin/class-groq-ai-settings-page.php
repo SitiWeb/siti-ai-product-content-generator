@@ -1,0 +1,569 @@
+<?php
+
+class Groq_AI_Product_Text_Settings_Page {
+	private $plugin;
+	private $provider_manager;
+
+	public function __construct( $plugin, Groq_AI_Provider_Manager $provider_manager ) {
+		$this->plugin            = $plugin;
+		$this->provider_manager  = $provider_manager;
+
+		add_action( 'admin_menu', [ $this, 'register_settings_pages' ] );
+		add_action( 'admin_init', [ $this, 'register_settings' ] );
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_settings_assets' ] );
+		add_action( 'admin_head', [ $this, 'hide_menu_links' ] );
+	}
+
+	public function register_settings_pages() {
+		add_options_page(
+			__( 'Siti AI Productteksten', 'groq-ai-product-text' ),
+			__( 'Siti AI', 'groq-ai-product-text' ),
+			'manage_options',
+			'groq-ai-product-text',
+			[ $this, 'render_settings_page' ]
+		);
+
+		add_submenu_page(
+			'options-general.php',
+			__( 'Siti AI Modules', 'groq-ai-product-text' ),
+			__( 'Siti AI Modules', 'groq-ai-product-text' ),
+			'manage_options',
+			'groq-ai-product-text-modules',
+			[ $this, 'render_modules_page' ]
+		);
+
+		add_submenu_page(
+			'options-general.php',
+			__( 'Siti AI AI-logboek', 'groq-ai-product-text' ),
+			__( 'Siti AI AI-logboek', 'groq-ai-product-text' ),
+			'manage_options',
+			'groq-ai-product-text-logs',
+			[ $this, 'render_logs_page' ]
+		);
+
+	}
+
+	public function hide_menu_links() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		?>
+		<style>
+			#adminmenu a[href="options-general.php?page=groq-ai-product-text-modules"],
+			#adminmenu a[href="options-general.php?page=groq-ai-product-text-logs"] {
+				display: none !important;
+			}
+		</style>
+		<?php
+	}
+
+	public function register_settings() {
+		register_setting( 'groq_ai_product_text_group', $this->plugin->get_option_key(), [ $this->plugin, 'sanitize_settings' ] );
+
+		add_settings_section(
+			'groq_ai_product_text_general',
+			__( 'Algemene instellingen', 'groq-ai-product-text' ),
+			'__return_false',
+			'groq-ai-product-text'
+		);
+
+		add_settings_field(
+			'groq_ai_provider',
+			__( 'AI-aanbieder', 'groq-ai-product-text' ),
+			[ $this, 'render_provider_field' ],
+			'groq-ai-product-text',
+			'groq_ai_product_text_general'
+		);
+
+		add_settings_field(
+			'groq_ai_model',
+			__( 'Model', 'groq-ai-product-text' ),
+			[ $this, 'render_model_field' ],
+			'groq-ai-product-text',
+			'groq_ai_product_text_general'
+		);
+
+		foreach ( $this->provider_manager->get_providers() as $provider ) {
+		add_settings_field(
+			'groq_ai_api_key_' . $provider->get_key(),
+			sprintf( __( '%s API-sleutel', 'groq-ai-product-text' ), $provider->get_label() ),
+			[ $this, 'render_provider_api_key_field' ],
+			'groq-ai-product-text',
+			'groq_ai_product_text_general',
+			[
+				'provider' => $provider,
+				]
+			);
+		}
+
+		add_settings_field(
+			'groq_ai_store_context',
+			__( 'Winkelcontext', 'groq-ai-product-text' ),
+			[ $this, 'render_store_context_field' ],
+			'groq-ai-product-text',
+			'groq_ai_product_text_general'
+		);
+
+		add_settings_field(
+			'groq_ai_default_prompt',
+			__( 'Standaard prompt', 'groq-ai-product-text' ),
+			[ $this, 'render_default_prompt_field' ],
+			'groq-ai-product-text',
+			'groq_ai_product_text_general'
+		);
+
+		add_settings_field(
+			'groq_ai_context_fields',
+			__( 'Standaard productcontext', 'groq-ai-product-text' ),
+			[ $this, 'render_context_fields_field' ],
+			'groq-ai-product-text',
+			'groq_ai_product_text_general'
+		);
+
+		add_settings_field(
+			'groq_ai_response_format_compat',
+			__( 'Response-format compatibiliteit', 'groq-ai-product-text' ),
+			[ $this, 'render_response_format_compat_field' ],
+			'groq-ai-product-text',
+			'groq_ai_product_text_general'
+		);
+
+		add_settings_section(
+			'groq_ai_product_text_modules_rankmath',
+			__( 'Rank Math SEO', 'groq-ai-product-text' ),
+			'__return_false',
+			'groq-ai-product-text-modules'
+		);
+
+		add_settings_field(
+			'groq_ai_module_rankmath',
+			__( 'Rank Math SEO', 'groq-ai-product-text' ),
+			[ $this, 'render_rankmath_module_field' ],
+			'groq-ai-product-text-modules',
+			'groq_ai_product_text_modules_rankmath'
+		);
+	}
+
+	public function render_settings_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$settings = $this->plugin->get_settings();
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Siti AI Productteksten', 'groq-ai-product-text' ); ?></h1>
+			<p style="margin-bottom:16px;">
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=groq-ai-product-text-modules' ) ); ?>" class="button button-secondary">
+					<?php esc_html_e( 'Ga naar modules', 'groq-ai-product-text' ); ?>
+				</a>
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=groq-ai-product-text-logs' ) ); ?>" class="button">
+					<?php esc_html_e( 'Bekijk AI-logboek', 'groq-ai-product-text' ); ?>
+				</a>
+			</p>
+			<p><?php esc_html_e( 'Kies je AI-aanbieder, stel de juiste API-sleutel en het gewenste model in en beheer optionele winkelcontext of standaard prompt.', 'groq-ai-product-text' ); ?></p>
+			<form action="options.php" method="post">
+				<?php
+				settings_fields( 'groq_ai_product_text_group' );
+				do_settings_sections( 'groq-ai-product-text' );
+				submit_button();
+				?>
+			</form>
+			<div class="groq-ai-prompt-helper">
+				<h2><?php esc_html_e( 'Prompt generator', 'groq-ai-product-text' ); ?></h2>
+				<p><?php esc_html_e( 'Gebruik deze velden om belangrijke informatie voor de AI bij te houden (bijvoorbeeld tone of voice, USP’s of doelgroepen). Voeg ze toe aan je prompt met kopiëren en plakken.', 'groq-ai-product-text' ); ?></p>
+				<textarea class="large-text" rows="6" readonly><?php echo esc_textarea( $this->plugin->build_prompt_template_preview( $settings ) ); ?></textarea>
+			</div>
+		</div>
+		<?php
+	}
+
+	public function render_modules_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Siti AI Modules', 'groq-ai-product-text' ); ?></h1>
+			<p><?php esc_html_e( 'Beheer aparte integraties zoals Rank Math. Het uitschakelen van een module verwijdert de bijbehorende AI-uitvoer automatisch uit de productmodal.', 'groq-ai-product-text' ); ?></p>
+			<form action="options.php" method="post">
+				<?php
+				settings_fields( 'groq_ai_product_text_group' );
+				do_settings_sections( 'groq-ai-product-text-modules' );
+				submit_button();
+				?>
+			</form>
+		</div>
+		<?php
+	}
+
+	public function render_logs_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$logs_table = new Groq_AI_Logs_Table( $this->plugin );
+		$logs_table->prepare_items();
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'AI-logboek', 'groq-ai-product-text' ); ?></h1>
+			<p><?php esc_html_e( 'Bekijk recente AI-generaties inclusief status, gebruiker en tokens.', 'groq-ai-product-text' ); ?></p>
+			<form method="get">
+				<input type="hidden" name="page" value="groq-ai-product-text-logs" />
+				<?php $logs_table->search_box( __( 'Zoek logs', 'groq-ai-product-text' ), 'groq-ai-logs' ); ?>
+				<?php $logs_table->display(); ?>
+			</form>
+		</div>
+		<div id="groq-ai-log-modal" class="groq-ai-log-modal" aria-hidden="true">
+			<div class="groq-ai-log-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="groq-ai-log-modal-title">
+				<button type="button" class="groq-ai-log-modal__close" aria-label="<?php esc_attr_e( 'Sluiten', 'groq-ai-product-text' ); ?>">&times;</button>
+				<div class="groq-ai-log-modal__content">
+					<h2 id="groq-ai-log-modal-title"><?php esc_html_e( 'Logdetails', 'groq-ai-product-text' ); ?></h2>
+					<p class="description groq-ai-log-meta"></p>
+					<div class="groq-ai-log-fields">
+						<label>
+							<span><?php esc_html_e( 'Prompt', 'groq-ai-product-text' ); ?></span>
+							<textarea id="groq-ai-log-prompt" readonly rows="6"></textarea>
+						</label>
+						<label>
+							<span><?php esc_html_e( 'Response', 'groq-ai-product-text' ); ?></span>
+							<textarea id="groq-ai-log-response" readonly rows="6"></textarea>
+						</label>
+						<div class="groq-ai-log-tokens">
+							<div>
+								<strong><?php esc_html_e( 'Tokens prompt', 'groq-ai-product-text' ); ?></strong>
+								<span id="groq-ai-log-tokens-prompt">—</span>
+							</div>
+							<div>
+								<strong><?php esc_html_e( 'Tokens response', 'groq-ai-product-text' ); ?></strong>
+								<span id="groq-ai-log-tokens-completion">—</span>
+							</div>
+							<div>
+								<strong><?php esc_html_e( 'Tokens totaal', 'groq-ai-product-text' ); ?></strong>
+								<span id="groq-ai-log-tokens-total">—</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<style>
+			.groq-ai-log-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.65);display:none;align-items:center;justify-content:center;z-index:100000;}
+			.groq-ai-log-modal.is-open{display:flex;}
+			.groq-ai-log-modal__dialog{background:#fff;max-width:900px;width:90%;padding:20px;box-shadow:0 10px 40px rgba(0,0,0,0.3);position:relative;}
+			.groq-ai-log-modal__close{position:absolute;top:10px;right:10px;border:none;background:transparent;font-size:24px;cursor:pointer;}
+			.groq-ai-log-fields label{display:block;margin-bottom:15px;}
+			.groq-ai-log-fields textarea{width:100%;}
+			.groq-ai-log-tokens{display:flex;gap:20px;margin-top:10px;}
+			.groq-ai-log-row{display:inline-block;}
+		</style>
+		<script>
+			(function(){
+				const modal=document.getElementById('groq-ai-log-modal');
+				if(!modal){return;}
+				const closeBtn=modal.querySelector('.groq-ai-log-modal__close');
+				const promptField=document.getElementById('groq-ai-log-prompt');
+				const responseField=document.getElementById('groq-ai-log-response');
+				const tokensPrompt=document.getElementById('groq-ai-log-tokens-prompt');
+				const tokensCompletion=document.getElementById('groq-ai-log-tokens-completion');
+				const tokensTotal=document.getElementById('groq-ai-log-tokens-total');
+				const meta=document.querySelector('.groq-ai-log-meta');
+				function openModal(data){
+					if(!data){return;}
+					if(promptField){promptField.value=data.prompt||'';}
+					if(responseField){responseField.value=data.response||'';}
+					if(tokensPrompt){tokensPrompt.textContent=Number.isFinite(data.tokens_prompt)?data.tokens_prompt:'—';}
+					if(tokensCompletion){tokensCompletion.textContent=Number.isFinite(data.tokens_completion)?data.tokens_completion:'—';}
+					if(tokensTotal){tokensTotal.textContent=Number.isFinite(data.tokens_total)?data.tokens_total:'—';}
+					if(meta){
+						meta.textContent=(data.provider||'')+' • '+(data.model||'')+' • '+(data.post_title||'')+' • '+(data.status||'');
+					}
+					modal.classList.add('is-open');
+					modal.setAttribute('aria-hidden','false');
+				}
+				function closeModal(){
+					modal.classList.remove('is-open');
+					modal.setAttribute('aria-hidden','true');
+				}
+				document.addEventListener('click',function(e){
+					const link=e.target.closest('.groq-ai-log-row');
+					if(link){
+						e.preventDefault();
+						let payload=link.getAttribute('data-groq-log');
+						if(payload){
+							try{
+								const data=JSON.parse(payload);
+								openModal(data);
+							}catch(err){
+								console.error('Invalid log payload',err);
+							}
+						}
+					}
+					if(e.target===modal){
+						closeModal();
+					}
+				});
+				if(closeBtn){
+					closeBtn.addEventListener('click',closeModal);
+				}
+				document.addEventListener('keyup',function(e){
+					if(e.key==='Escape' && modal.classList.contains('is-open')){
+						closeModal();
+					}
+				});
+			})();
+		</script>
+		<?php
+	}
+
+	public function render_provider_field() {
+		$settings  = $this->plugin->get_settings();
+		$providers = $this->provider_manager->get_providers();
+		?>
+		<select name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[provider]">
+			<?php foreach ( $providers as $provider ) : ?>
+				<option value="<?php echo esc_attr( $provider->get_key() ); ?>" <?php selected( $settings['provider'], $provider->get_key() ); ?>>
+					<?php echo esc_html( $provider->get_label() ); ?>
+				</option>
+			<?php endforeach; ?>
+		</select>
+		<p class="description"><?php esc_html_e( 'Bepaal welke AI-dienst wordt aangesproken wanneer je teksten genereert.', 'groq-ai-product-text' ); ?></p>
+		<?php
+	}
+
+	public function render_model_field() {
+		$settings       = $this->plugin->get_settings();
+		$current_model  = $settings['model'];
+		$current_provider = $settings['provider'];
+		?>
+		<div class="groq-ai-model-field">
+			<select
+				id="groq-ai-model-select"
+				class="groq-ai-model-select"
+				name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[model]"
+				data-current-model="<?php echo esc_attr( $current_model ); ?>"
+			>
+				<option value=""><?php esc_html_e( 'Selecteer een model via "Live modellen ophalen"', 'groq-ai-product-text' ); ?></option>
+			</select>
+			<p class="description"><?php esc_html_e( 'Gebruik de knop hieronder om rechtstreeks via het API-endpoint beschikbare modellen op te halen. Zonder een live lijst blijft de selectie leeg.', 'groq-ai-product-text' ); ?></p>
+			<button type="button" class="button" id="groq-ai-refresh-models" style="margin-top:10px;">
+				<?php esc_html_e( 'Live modellen ophalen', 'groq-ai-product-text' ); ?>
+			</button>
+			<p id="groq-ai-refresh-models-status" class="description" aria-live="polite"></p>
+		</div>
+		<?php
+	}
+
+	public function render_provider_api_key_field( $args ) {
+		$settings = $this->plugin->get_settings();
+		/** @var Groq_AI_Provider_Interface $provider */
+		$provider       = $args['provider'];
+		$field          = $provider->get_option_key();
+		$provider_key   = $provider->get_key();
+		?>
+		<div class="groq-ai-provider-field" data-provider-row="<?php echo esc_attr( $provider_key ); ?>">
+			<input type="password" name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[<?php echo esc_attr( $field ); ?>]" value="<?php echo esc_attr( $settings[ $field ] ); ?>" class="regular-text" autocomplete="off" />
+			<p class="description">
+				<?php
+				printf(
+					/* translators: %s: provider name */
+					esc_html__( 'Voeg hier de API-sleutel voor %s toe.', 'groq-ai-product-text' ),
+					esc_html( $provider->get_label() )
+				);
+				?>
+			</p>
+		</div>
+		<?php
+	}
+
+	public function render_store_context_field() {
+		$settings = $this->plugin->get_settings();
+		?>
+		<textarea name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[store_context]" class="large-text" rows="4"><?php echo esc_textarea( $settings['store_context'] ); ?></textarea>
+		<p class="description"><?php esc_html_e( 'Beschrijf het merk, de tone of voice en andere relevante winkelinformatie.', 'groq-ai-product-text' ); ?></p>
+		<?php
+	}
+
+	public function render_default_prompt_field() {
+		$settings = $this->plugin->get_settings();
+		?>
+		<textarea name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[default_prompt]" class="large-text" rows="4" placeholder="<?php esc_attr_e( 'Bijvoorbeeld: Schrijf een overtuigende productbeschrijving met nadruk op kwaliteit en levertijd.', 'groq-ai-product-text' ); ?>"><?php echo esc_textarea( $settings['default_prompt'] ); ?></textarea>
+		<p class="description"><?php esc_html_e( 'Deze tekst verschijnt vooraf ingevuld in de AI-popup, maar kan per product worden aangepast.', 'groq-ai-product-text' ); ?></p>
+		<?php
+	}
+
+	public function render_context_fields_field() {
+		$settings    = $this->plugin->get_settings();
+		$values      = isset( $settings['context_fields'] ) ? $settings['context_fields'] : $this->plugin->get_default_context_fields();
+		$definitions = $this->plugin->get_context_field_definitions();
+		?>
+		<div class="groq-ai-context-defaults">
+			<?php foreach ( $definitions as $key => $definition ) :
+				$checked = ! empty( $values[ $key ] );
+				?>
+				<label>
+					<input type="checkbox" name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[context_fields][<?php echo esc_attr( $key ); ?>]" value="1" <?php checked( $checked ); ?> />
+					<strong><?php echo esc_html( $definition['label'] ); ?></strong>
+				</label>
+				<?php if ( ! empty( $definition['description'] ) ) : ?>
+					<p class="description" style="margin-top:-8px;margin-bottom:12px;">
+						<?php echo esc_html( $definition['description'] ); ?>
+					</p>
+				<?php endif; ?>
+			<?php endforeach; ?>
+		</div>
+		<?php
+	}
+
+	public function render_response_format_compat_field() {
+		$settings = $this->plugin->get_settings();
+		$is_enabled = ! empty( $settings['response_format_compat'] );
+		?>
+		<label>
+			<input type="checkbox" name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[response_format_compat]" value="1" <?php checked( $is_enabled ); ?> />
+			<?php esc_html_e( 'Compatibele modus inschakelen (instructies toevoegen aan de prompt).', 'groq-ai-product-text' ); ?>
+		</label>
+		<p class="description">
+			<?php esc_html_e( 'Standaard gebruikt de plugin de response_format-functie van aanbieders zoals Groq en OpenAI voor gegarandeerde JSON-uitvoer. Schakel deze optie alleen in wanneer je problemen ervaart met oudere modellen of eigen integraties die deze functie niet ondersteunen.', 'groq-ai-product-text' ); ?>
+		</p>
+		<?php
+	}
+
+	public function render_rankmath_module_field() {
+		$settings       = $this->plugin->get_settings();
+		$defaults       = $this->plugin->get_default_modules_settings();
+		$modules        = isset( $settings['modules'] ) ? $settings['modules'] : $defaults;
+		$config         = isset( $modules['rankmath'] ) ? $modules['rankmath'] : ( $defaults['rankmath'] ?? [] );
+		$rankmath_active = $this->plugin->is_rankmath_active();
+		$enabled        = $rankmath_active && ! empty( $config['enabled'] );
+		$keyword_limit  = isset( $config['focus_keyword_limit'] ) ? absint( $config['focus_keyword_limit'] ) : ( $defaults['rankmath']['focus_keyword_limit'] ?? 3 );
+		$keyword_limit  = $keyword_limit > 0 ? $keyword_limit : 3;
+		$title_pixels   = isset( $config['meta_title_pixel_limit'] ) ? absint( $config['meta_title_pixel_limit'] ) : ( $defaults['rankmath']['meta_title_pixel_limit'] ?? 580 );
+		$title_pixels   = $title_pixels > 0 ? $title_pixels : 580;
+		$pixel_limit    = isset( $config['meta_description_pixel_limit'] ) ? absint( $config['meta_description_pixel_limit'] ) : ( $defaults['rankmath']['meta_description_pixel_limit'] ?? 920 );
+		$pixel_limit    = $pixel_limit > 0 ? $pixel_limit : 920;
+		$rankmath_active = $this->plugin->is_rankmath_active();
+		?>
+		<div class="groq-ai-module-field">
+			<input type="hidden" name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[modules][rankmath][enabled]" value="0" />
+			<label>
+				<input type="checkbox" name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[modules][rankmath][enabled]" value="1" <?php checked( $enabled ); ?> <?php disabled( ! $rankmath_active ); ?> />
+				<?php esc_html_e( 'Activeer Rank Math integratie (meta title, meta description en focus keywords genereren).', 'groq-ai-product-text' ); ?>
+			</label>
+			<p class="description" style="margin-top:4px;">
+				<?php
+				if ( ! $rankmath_active ) {
+					esc_html_e( 'Installeer en activeer Rank Math om deze opties te gebruiken. Velden zijn momenteel alleen-lezen.', 'groq-ai-product-text' );
+				} else {
+					esc_html_e( 'Wanneer ingeschakeld worden extra velden in de AI-modal getoond en automatisch gekoppeld aan Rank Math.', 'groq-ai-product-text' );
+				}
+				?>
+			</p>
+			<label for="groq-ai-rankmath-keywords">
+				<?php esc_html_e( 'Aantal focus keywords om te genereren', 'groq-ai-product-text' ); ?>
+			</label>
+			<input
+				type="number"
+				id="groq-ai-rankmath-keywords"
+				min="1"
+				max="99"
+				name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[modules][rankmath][focus_keyword_limit]"
+				value="<?php echo esc_attr( $keyword_limit ); ?>"
+				style="width: 80px;"
+				<?php disabled( ! $rankmath_active ); ?>
+			/>
+			<p class="description">
+				<?php esc_html_e( 'Bepaal hoeveel zoekwoorden de AI maximaal mag teruggeven (bijvoorbeeld 3).', 'groq-ai-product-text' ); ?>
+			</p>
+			<label for="groq-ai-rankmath-title-pixels">
+				<?php esc_html_e( 'Maximale meta title breedte (pixels)', 'groq-ai-product-text' ); ?>
+			</label>
+			<input
+				type="number"
+				id="groq-ai-rankmath-title-pixels"
+				min="1"
+				max="1200"
+				step="1"
+				name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[modules][rankmath][meta_title_pixel_limit]"
+				value="<?php echo esc_attr( $title_pixels ); ?>"
+				style="width: 100px;"
+				<?php disabled( ! $rankmath_active ); ?>
+			/>
+			<p class="description">
+				<?php esc_html_e( 'Bepaal hoe breed (in pixels) de meta title maximaal mag zijn volgens de SERP-richtlijnen.', 'groq-ai-product-text' ); ?>
+			</p>
+			<label for="groq-ai-rankmath-pixels">
+				<?php esc_html_e( 'Maximale meta description breedte (pixels)', 'groq-ai-product-text' ); ?>
+			</label>
+			<input
+				type="number"
+				id="groq-ai-rankmath-pixels"
+				min="1"
+				max="2000"
+				step="1"
+				name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[modules][rankmath][meta_description_pixel_limit]"
+				value="<?php echo esc_attr( $pixel_limit ); ?>"
+				style="width: 100px;"
+				<?php disabled( ! $rankmath_active ); ?>
+			/>
+			<p class="description">
+				<?php esc_html_e( 'Gebruik het SERP-voorbeeld als referentie. De AI krijgt door dat de meta description deze pixelbreedte niet mag overschrijden.', 'groq-ai-product-text' ); ?>
+			</p>
+		</div>
+		<?php
+	}
+
+	public function enqueue_settings_assets( $hook ) {
+		if ( ! in_array( $hook, [ 'settings_page_groq-ai-product-text', 'settings_page_groq-ai-product-text-modules' ], true ) ) {
+			return;
+		}
+
+		wp_enqueue_style(
+			'groq-ai-settings',
+			plugins_url( 'assets/css/admin.css', GROQ_AI_PRODUCT_TEXT_FILE ),
+			[],
+			GROQ_AI_PRODUCT_TEXT_VERSION
+		);
+
+		wp_enqueue_style(
+			'groq-ai-settings-extra',
+			plugins_url( 'assets/css/settings.css', GROQ_AI_PRODUCT_TEXT_FILE ),
+			[ 'groq-ai-settings' ],
+			GROQ_AI_PRODUCT_TEXT_VERSION
+		);
+
+		wp_enqueue_script(
+			'groq-ai-settings',
+			plugins_url( 'assets/js/settings.js', GROQ_AI_PRODUCT_TEXT_FILE ),
+			[],
+			GROQ_AI_PRODUCT_TEXT_VERSION,
+			true
+		);
+
+		$current_settings = $this->plugin->get_settings();
+		$data = [
+			'optionKey'       => $this->plugin->get_option_key(),
+			'providers'       => [],
+			'currentProvider' => $current_settings['provider'],
+			'currentModel'    => $current_settings['model'],
+			'providerRows'    => [],
+			'ajaxUrl'         => admin_url( 'admin-ajax.php' ),
+			'refreshNonce'    => wp_create_nonce( 'groq_ai_refresh_models' ),
+			'placeholders'    => [
+				'selectModel' => __( 'Selecteer een model via "Live modellen ophalen"', 'groq-ai-product-text' ),
+			],
+		];
+
+		foreach ( $this->provider_manager->get_providers() as $provider ) {
+			$data['providers'][ $provider->get_key() ] = [
+				'default_label' => sprintf( __( 'Gebruik standaardmodel (%s)', 'groq-ai-product-text' ), $provider->get_default_model() ),
+				'models'        => [],
+				'supports_live' => $provider->supports_live_models(),
+			];
+			$data['providerRows'][ $provider->get_key() ] = 'groq_ai_api_key_' . $provider->get_key();
+		}
+
+		wp_localize_script( 'groq-ai-settings', 'GroqAISettingsData', $data );
+	}
+}

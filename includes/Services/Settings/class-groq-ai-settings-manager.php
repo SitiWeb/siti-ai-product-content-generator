@@ -1,0 +1,295 @@
+<?php
+
+/**
+ * Beheert alle plugininstellingen: ophalen, standaardiseren en sanitizen.
+ */
+class Groq_AI_Settings_Manager {
+	/** @var string */
+	private $option_key;
+
+	/** @var Groq_AI_Provider_Manager */
+	private $provider_manager;
+
+	/** @var array|null */
+	private $context_field_definitions = null;
+
+	/** @var array|null */
+	private $default_modules = null;
+
+	public function __construct( $option_key, Groq_AI_Provider_Manager $provider_manager ) {
+		$this->option_key       = $option_key;
+		$this->provider_manager = $provider_manager;
+	}
+
+	/**
+	 * Geeft samengestelde instellingen terug (voormalige get_settings()).
+	 *
+	 * @return array
+	 */
+	public function all() {
+		$defaults = [
+			'provider'       => 'groq',
+			'model'          => '',
+			'store_context'  => '',
+			'default_prompt' => '',
+			'groq_api_key'   => '',
+			'openai_api_key' => '',
+			'google_api_key' => '',
+			'context_fields' => $this->get_default_context_fields(),
+			'modules'        => $this->get_default_modules_settings(),
+			'response_format_compat' => false,
+		];
+
+		$settings = get_option( $this->option_key, [] );
+		$settings = wp_parse_args( (array) $settings, $defaults );
+		$settings['context_fields'] = $this->normalize_context_fields( isset( $settings['context_fields'] ) ? $settings['context_fields'] : [] );
+		$settings['modules']        = $this->sanitize_modules_settings( isset( $settings['modules'] ) ? $settings['modules'] : [] );
+
+		return $settings;
+	}
+
+	/**
+	 * Sanitizelogica voor register_setting callback.
+	 *
+	 * @param array $input
+	 * @return array
+	 */
+	public function sanitize( $input ) {
+		$base_defaults = [
+			'provider'       => 'groq',
+			'model'          => '',
+			'store_context'  => '',
+			'default_prompt' => '',
+			'groq_api_key'   => '',
+			'openai_api_key' => '',
+			'google_api_key' => '',
+			'context_fields' => $this->get_default_context_fields(),
+			'modules'        => $this->get_default_modules_settings(),
+			'response_format_compat' => false,
+		];
+
+		$current_settings = $this->all();
+		$defaults         = wp_parse_args( $current_settings, $base_defaults );
+		$raw_input        = (array) $input;
+		$input            = wp_parse_args( $raw_input, $defaults );
+		$context_posted   = array_key_exists( 'context_fields', $raw_input );
+		$modules_posted   = array_key_exists( 'modules', $raw_input );
+
+		$provider = sanitize_text_field( $input['provider'] );
+		if ( ! $this->provider_manager->get_provider( $provider ) ) {
+			$provider = 'groq';
+		}
+
+		return [
+			'provider'       => $provider,
+			'model'          => sanitize_text_field( $input['model'] ),
+			'store_context'  => sanitize_textarea_field( $input['store_context'] ),
+			'default_prompt' => sanitize_textarea_field( $input['default_prompt'] ),
+			'groq_api_key'   => sanitize_text_field( $input['groq_api_key'] ),
+			'openai_api_key' => sanitize_text_field( $input['openai_api_key'] ),
+			'google_api_key' => sanitize_text_field( $input['google_api_key'] ),
+			'response_format_compat' => ! empty( $raw_input['response_format_compat'] ),
+			'context_fields' => $this->normalize_context_fields( $context_posted ? $raw_input['context_fields'] : $defaults['context_fields'] ),
+			'modules'        => $this->sanitize_modules_settings(
+				$modules_posted ? $raw_input['modules'] : [],
+				$defaults['modules'],
+				isset( $current_settings['modules'] ) ? (array) $current_settings['modules'] : $this->get_default_modules_settings(),
+				$modules_posted
+			),
+		];
+	}
+
+	public function get_context_field_definitions() {
+		if ( null === $this->context_field_definitions ) {
+			$this->context_field_definitions = [
+				'title'             => [
+					'label'       => __( 'Producttitel', 'groq-ai-product-text' ),
+					'description' => __( 'Voeg de huidige producttitel toe als context.', 'groq-ai-product-text' ),
+					'default'     => true,
+				],
+				'short_description' => [
+					'label'       => __( 'Korte beschrijving', 'groq-ai-product-text' ),
+					'description' => __( 'Gebruik de bestaande korte beschrijving (indien aanwezig).', 'groq-ai-product-text' ),
+					'default'     => true,
+				],
+				'description'       => [
+					'label'       => __( 'Volledige beschrijving', 'groq-ai-product-text' ),
+					'description' => __( 'Stuurt de huidige productbeschrijving mee als bronmateriaal.', 'groq-ai-product-text' ),
+					'default'     => true,
+				],
+				'attributes'        => [
+					'label'       => __( 'Attributen', 'groq-ai-product-text' ),
+					'description' => __( 'Voeg gestructureerde productattributen toe (zoals kleur, maat, materiaal).', 'groq-ai-product-text' ),
+					'default'     => false,
+				],
+			];
+		}
+
+		return $this->context_field_definitions;
+	}
+
+	public function get_default_context_fields() {
+		$definitions = $this->get_context_field_definitions();
+		$defaults    = [];
+
+		foreach ( $definitions as $key => $data ) {
+			$defaults[ $key ] = ! empty( $data['default'] );
+		}
+
+		return $defaults;
+	}
+
+	public function normalize_context_fields( $fields ) {
+		$definitions = $this->get_context_field_definitions();
+		$normalized  = [];
+
+		foreach ( $definitions as $key => $data ) {
+			$normalized[ $key ] = false;
+		}
+
+		if ( ! is_array( $fields ) ) {
+			return $normalized;
+		}
+
+		foreach ( $fields as $key => $value ) {
+			if ( is_int( $key ) ) {
+				$key   = sanitize_text_field( $value );
+				$value = true;
+			}
+
+			if ( array_key_exists( $key, $normalized ) ) {
+				$normalized[ $key ] = (bool) $value;
+			}
+		}
+
+		return $normalized;
+	}
+
+	public function get_default_modules_settings() {
+		if ( null === $this->default_modules ) {
+			$this->default_modules = [
+				'rankmath' => [
+					'enabled'                 => true,
+					'focus_keyword_limit'     => 3,
+					'meta_title_pixel_limit'  => 580,
+					'meta_description_pixel_limit' => 920,
+				],
+			];
+		}
+
+		return $this->default_modules;
+	}
+
+	public function get_module_config( $module, $settings = null ) {
+		if ( null === $settings ) {
+			$settings = $this->all();
+		}
+
+		$defaults = $this->get_default_modules_settings();
+		$modules  = isset( $settings['modules'] ) && is_array( $settings['modules'] ) ? $settings['modules'] : [];
+		$config   = isset( $modules[ $module ] ) ? (array) $modules[ $module ] : [];
+
+		return wp_parse_args( $config, isset( $defaults[ $module ] ) ? $defaults[ $module ] : [] );
+	}
+
+	public function is_module_enabled( $module, $settings = null ) {
+		$config = $this->get_module_config( $module, $settings );
+
+		return ! empty( $config['enabled'] );
+	}
+
+	public function get_rankmath_focus_keyword_limit( $settings = null ) {
+		$config = $this->get_module_config( 'rankmath', $settings );
+		$limit  = isset( $config['focus_keyword_limit'] ) ? absint( $config['focus_keyword_limit'] ) : 3;
+
+		return max( 1, min( 10, $limit ) );
+	}
+
+	public function get_rankmath_meta_title_pixel_limit( $settings = null ) {
+		$config = $this->get_module_config( 'rankmath', $settings );
+		$value  = isset( $config['meta_title_pixel_limit'] ) ? absint( $config['meta_title_pixel_limit'] ) : 580;
+
+		return max( 200, min( 1200, $value ) );
+	}
+
+	public function get_rankmath_meta_description_pixel_limit( $settings = null ) {
+		$config = $this->get_module_config( 'rankmath', $settings );
+		$value  = isset( $config['meta_description_pixel_limit'] ) ? absint( $config['meta_description_pixel_limit'] ) : 920;
+
+		return max( 200, min( 2000, $value ) );
+	}
+
+	public function is_response_format_compat_enabled( $settings = null ) {
+		if ( null === $settings ) {
+			$settings = $this->all();
+		}
+
+		return ! empty( $settings['response_format_compat'] );
+	}
+
+	/**
+	 * @param array|null $modules
+	 * @param array|null $defaults
+	 * @param array|null $current
+	 * @param bool       $is_posted
+	 * @return array
+	 */
+	private function sanitize_modules_settings( $modules, $defaults = null, $current = null, $is_posted = false ) {
+		$module_defaults = $this->get_default_modules_settings();
+
+		if ( ! is_array( $defaults ) ) {
+			$defaults = $module_defaults;
+		}
+
+		if ( ! is_array( $current ) ) {
+			$current = $defaults;
+		}
+
+		$current = wp_parse_args( $current, $defaults );
+
+		if ( ! is_array( $modules ) ) {
+			$modules = [];
+		}
+
+		if ( ! $is_posted ) {
+			$clean = [];
+			foreach ( $module_defaults as $module_key => $module_default_config ) {
+				$raw               = isset( $modules[ $module_key ] ) ? (array) $modules[ $module_key ] : [];
+				$clean[ $module_key ] = wp_parse_args( $raw, isset( $current[ $module_key ] ) ? $current[ $module_key ] : $module_default_config );
+			}
+
+			return $clean;
+		}
+
+		$result = $current;
+
+		foreach ( $module_defaults as $module_key => $module_default_config ) {
+			$raw            = isset( $modules[ $module_key ] ) ? (array) $modules[ $module_key ] : [];
+			$current_config = isset( $current[ $module_key ] ) ? (array) $current[ $module_key ] : $module_default_config;
+
+			$result[ $module_key ]['enabled'] = isset( $raw['enabled'] ) ? (bool) $raw['enabled'] : ( isset( $current_config['enabled'] ) ? (bool) $current_config['enabled'] : false );
+
+			if ( 'rankmath' === $module_key ) {
+				$limit = isset( $raw['focus_keyword_limit'] ) ? absint( $raw['focus_keyword_limit'] ) : ( isset( $current_config['focus_keyword_limit'] ) ? absint( $current_config['focus_keyword_limit'] ) : $module_default_config['focus_keyword_limit'] );
+				if ( $limit <= 0 ) {
+					$limit = $module_default_config['focus_keyword_limit'];
+				}
+				$result[ $module_key ]['focus_keyword_limit'] = max( 1, min( 10, $limit ) );
+
+				$title_pixel_limit = isset( $raw['meta_title_pixel_limit'] ) ? absint( $raw['meta_title_pixel_limit'] ) : ( isset( $current_config['meta_title_pixel_limit'] ) ? absint( $current_config['meta_title_pixel_limit'] ) : $module_default_config['meta_title_pixel_limit'] );
+				if ( $title_pixel_limit <= 0 ) {
+					$title_pixel_limit = $module_default_config['meta_title_pixel_limit'];
+				}
+				$result[ $module_key ]['meta_title_pixel_limit'] = max( 200, min( 1200, $title_pixel_limit ) );
+
+				$pixel_limit = isset( $raw['meta_description_pixel_limit'] ) ? absint( $raw['meta_description_pixel_limit'] ) : ( isset( $current_config['meta_description_pixel_limit'] ) ? absint( $current_config['meta_description_pixel_limit'] ) : $module_default_config['meta_description_pixel_limit'] );
+				if ( $pixel_limit <= 0 ) {
+					$pixel_limit = $module_default_config['meta_description_pixel_limit'];
+				}
+				$result[ $module_key ]['meta_description_pixel_limit'] = max( 200, min( 2000, $pixel_limit ) );
+			}
+		}
+
+		return $result;
+	}
+}

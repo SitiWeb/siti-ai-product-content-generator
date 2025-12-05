@@ -1,0 +1,31 @@
+.groq-ai-model-field select {
+	min-width: 300px;
+}
+
+.groq-ai-model-custom {
+	margin-top: 10px;
+}
+
+#groq-ai-refresh-models {
+	margin-top: 10px;
+}
+
+#groq-ai-refresh-models-status {
+	margin-top: 6px;
+	font-size: 13px;
+}
+
+#groq-ai-refresh-models-status[data-status='error'] {
+	color: #b32d2e;
+}
+
+#groq-ai-refresh-models-status[data-status='success'] {
+	color: #008a20;
+}
+
+.groq-ai-context-defaults label {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	margin-top: 8px;
+}

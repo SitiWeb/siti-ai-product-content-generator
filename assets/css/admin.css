@@ -1,0 +1,236 @@
+.groq-ai-modal {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.55);
+	display: none;
+	align-items: center;
+	justify-content: center;
+	z-index: 100000;
+}
+
+.groq-ai-modal.is-open {
+	display: flex;
+}
+
+.groq-ai-modal__dialog {
+	background: #fff;
+	max-width: 640px;
+	width: 90%;
+	padding: 24px;
+	border-radius: 6px;
+	box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+	position: relative;
+	max-height: 90vh;
+	overflow: hidden;
+}
+
+.groq-ai-modal__dialog-inner {
+	max-height: calc(90vh - 20px);
+	overflow-y: auto;
+	padding-right: 8px;
+}
+
+.groq-ai-modal__close {
+	position: absolute;
+	top: 12px;
+	right: 12px;
+	border: none;
+	background: transparent;
+	font-size: 24px;
+	cursor: pointer;
+}
+
+.groq-ai-modal textarea {
+	width: 100%;
+	margin-top: 8px;
+}
+
+.groq-ai-modal__context {
+	background: #f4f4f4;
+	padding: 12px;
+	border-radius: 4px;
+	margin-bottom: 12px;
+	font-size: 13px;
+}
+
+.groq-ai-modal__actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.groq-ai-context-options {
+	margin-top: 0;
+	padding: 12px;
+	border-top: 1px solid #dcdcde;
+	background: #f9f9f9;
+}
+
+.groq-ai-context-options__grid {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.groq-ai-context-option {
+	display: flex;
+	gap: 10px;
+	align-items: flex-start;
+}
+
+.groq-ai-context-option input[type='checkbox'] {
+	margin-top: 4px;
+}
+
+.groq-ai-modal__result {
+	margin-top: 16px;
+	background: #fafafa;
+	border: 1px solid #e5e5e5;
+	padding: 12px;
+	border-radius: 4px;
+	max-height: none;
+	overflow: visible;
+}
+
+.groq-ai-result-grid {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.groq-ai-result-field {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	padding: 10px;
+}
+
+.groq-ai-result-field__header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 12px;
+}
+
+.groq-ai-result-field__actions {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+}
+
+.groq-ai-result-field textarea {
+	margin-top: 8px;
+	width: 100%;
+}
+
+.groq-ai-modal__raw {
+	margin-top: 16px;
+}
+
+.groq-ai-modal__raw pre {
+	background: #1e1e1e;
+	color: #f8f8f2;
+	padding: 12px;
+	border-radius: 4px;
+	max-height: 160px;
+	overflow: auto;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.groq-ai-modal__status {
+	margin-top: 10px;
+	font-size: 13px;
+}
+
+.groq-ai-modal__status[data-status='error'] {
+	color: #b32d2e;
+}
+
+.groq-ai-modal__status[data-status='success'] {
+	color: #008a20;
+}
+
+.groq-ai-modal.is-loading .groq-ai-modal__dialog::after {
+	content: '';
+	position: absolute;
+	top: 12px;
+	left: 12px;
+	width: 18px;
+	height: 18px;
+	border: 2px solid #2271b1;
+	border-right-color: transparent;
+	border-radius: 50%;
+	animation: groq-spin 0.8s linear infinite;
+}
+
+@keyframes groq-spin {
+	from {
+		transform: rotate(0);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.wrap .groq-ai-prompt-helper {
+	margin-top: 30px;
+	background: #fff;
+	padding: 20px;
+	border: 1px solid #ccd0d4;
+	border-radius: 6px;
+}
+
+.groq-ai-advanced-settings {
+	margin-top: 16px;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	background: #fff;
+}
+
+.groq-ai-advanced-toggle {
+	width: 100%;
+	background: none;
+	border: none;
+	padding: 10px 14px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 14px;
+	font-weight: 600;
+	color: #1d2327;
+	cursor: pointer;
+}
+
+.groq-ai-advanced-toggle__icon {
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	border-right: 2px solid currentColor;
+	border-bottom: 2px solid currentColor;
+	transform: rotate(45deg);
+	transition: transform 0.2s ease;
+}
+
+.groq-ai-advanced-toggle.is-open .groq-ai-advanced-toggle__icon {
+	transform: rotate(-135deg);
+}
+
+.groq-ai-apply-status {
+	min-width: 16px;
+	font-weight: 700;
+	font-size: 16px;
+	line-height: 1;
+	opacity: 0;
+	transition: opacity 0.2s ease;
+}
+
+.groq-ai-apply-status.is-success {
+	color: #1b9a3c;
+	opacity: 1;
+}
+
+.groq-ai-apply-status.is-error {
+	color: #b32d2e;
+	opacity: 1;
+}
