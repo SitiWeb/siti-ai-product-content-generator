@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SitiAI Product Teksten
  * Description: Genereer productteksten met diverse AI-aanbieders rechtstreeks vanuit WooCommerce.
- * Version: 1.1.0
+ * Version: 1.1.1
  * Author: SitiAI
  */
 
@@ -29,24 +29,6 @@ if ( ! defined( 'GROQ_AI_PRODUCT_TEXT_VERSION' ) ) {
 
 if ( ! defined( 'GROQ_AI_DEBUG_TRACE_ADDED' ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 	define( 'GROQ_AI_DEBUG_TRACE_ADDED', true );
-
-	set_error_handler(
-		function ( $errno, $errstr, $errfile, $errline ) {
-			$target_lines = [
-				'/wp-includes/functions.php:7291',
-				'/wp-includes/functions.php:2187',
-			];
-
-			foreach ( $target_lines as $needle ) {
-				if ( false !== strpos( $errfile . ':' . $errline, $needle ) ) {
-					error_log( '[GroqAI Debug] ' . $errstr . ' | Stack: ' . wp_debug_backtrace_summary( null, 0, true ) );
-					break;
-				}
-			}
-
-			return false;
-		}
-	);
 }
 
 require_once __DIR__ . '/includes/Core/class-groq-ai-service-container.php';
