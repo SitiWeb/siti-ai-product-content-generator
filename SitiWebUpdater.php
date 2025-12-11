@@ -22,12 +22,17 @@ class SitiWebUpdater {
 
 		$this->file = $file;
 
+		$this->set_plugin_properties();
 		add_action( 'admin_init', array( $this, 'set_plugin_properties' ) );
 
 		return $this;
 	}
 
 	public function set_plugin_properties() {
+		if ( ! function_exists( 'get_plugin_data' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
 		$this->plugin	= get_plugin_data( $this->file );
 		$this->basename = plugin_basename( $this->file );
 		$this->active	= is_plugin_active( $this->basename );
