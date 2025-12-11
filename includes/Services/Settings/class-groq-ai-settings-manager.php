@@ -37,6 +37,7 @@ class Groq_AI_Settings_Manager {
 			'google_api_key' => '',
 			'context_fields' => $this->get_default_context_fields(),
 			'modules'        => $this->get_default_modules_settings(),
+			'image_context_mode' => 'url',
 			'response_format_compat' => false,
 		];
 
@@ -44,6 +45,19 @@ class Groq_AI_Settings_Manager {
 		$settings = wp_parse_args( (array) $settings, $defaults );
 		$settings['context_fields'] = $this->normalize_context_fields( isset( $settings['context_fields'] ) ? $settings['context_fields'] : [] );
 		$settings['modules']        = $this->sanitize_modules_settings( isset( $settings['modules'] ) ? $settings['modules'] : [] );
+		$settings['model']          = Groq_AI_Model_Exclusions::ensure_allowed( $settings['provider'], isset( $settings['model'] ) ? $settings['model'] : '' );
+
+		$image_mode = isset( $settings['image_context_mode'] ) ? sanitize_text_field( $settings['image_context_mode'] ) : 'url';
+		if ( 'none' === $image_mode ) {
+			$settings['context_fields']['images'] = false;
+			$settings['image_context_mode']       = 'none';
+		} elseif ( in_array( $image_mode, [ 'url', 'base64' ], true ) ) {
+			$settings['context_fields']['images'] = true;
+			$settings['image_context_mode']       = $image_mode;
+		} else {
+			$settings['context_fields']['images'] = true;
+			$settings['image_context_mode']       = 'url';
+		}
 
 		return $settings;
 	}
@@ -65,6 +79,7 @@ class Groq_AI_Settings_Manager {
 			'google_api_key' => '',
 			'context_fields' => $this->get_default_context_fields(),
 			'modules'        => $this->get_default_modules_settings(),
+			'image_context_mode' => 'url',
 			'response_format_compat' => false,
 		];
 
@@ -80,16 +95,34 @@ class Groq_AI_Settings_Manager {
 			$provider = 'groq';
 		}
 
+		$model = sanitize_text_field( $input['model'] );
+		$model = Groq_AI_Model_Exclusions::ensure_allowed( $provider, $model );
+
+		$image_mode = isset( $input['image_context_mode'] ) ? sanitize_text_field( $input['image_context_mode'] ) : $defaults['image_context_mode'];
+		$allowed_modes = [ 'none', 'base64', 'url' ];
+		if ( ! in_array( $image_mode, $allowed_modes, true ) ) {
+			$image_mode = 'url';
+		}
+
+		$context_fields = $this->normalize_context_fields( $context_posted ? $raw_input['context_fields'] : $defaults['context_fields'] );
+
+		if ( 'none' === $image_mode ) {
+			$context_fields['images'] = false;
+		} else {
+			$context_fields['images'] = true;
+		}
+
 		return [
 			'provider'       => $provider,
-			'model'          => sanitize_text_field( $input['model'] ),
+			'model'          => $model,
 			'store_context'  => sanitize_textarea_field( $input['store_context'] ),
 			'default_prompt' => sanitize_textarea_field( $input['default_prompt'] ),
 			'groq_api_key'   => sanitize_text_field( $input['groq_api_key'] ),
 			'openai_api_key' => sanitize_text_field( $input['openai_api_key'] ),
 			'google_api_key' => sanitize_text_field( $input['google_api_key'] ),
 			'response_format_compat' => ! empty( $raw_input['response_format_compat'] ),
-			'context_fields' => $this->normalize_context_fields( $context_posted ? $raw_input['context_fields'] : $defaults['context_fields'] ),
+			'image_context_mode' => $image_mode,
+			'context_fields' => $context_fields,
 			'modules'        => $this->sanitize_modules_settings(
 				$modules_posted ? $raw_input['modules'] : [],
 				$defaults['modules'],
@@ -120,6 +153,11 @@ class Groq_AI_Settings_Manager {
 				'attributes'        => [
 					'label'       => __( 'Attributen', 'groq-ai-product-text' ),
 					'description' => __( 'Voeg gestructureerde productattributen toe (zoals kleur, maat, materiaal).', 'groq-ai-product-text' ),
+					'default'     => false,
+				],
+				'images'            => [
+					'label'       => __( 'Afbeeldingen', 'groq-ai-product-text' ),
+					'description' => __( 'Voeg een korte lijst toe met productafbeeldingen (beschrijving + URL).', 'groq-ai-product-text' ),
 					'default'     => false,
 				],
 			];
@@ -217,6 +255,17 @@ class Groq_AI_Settings_Manager {
 		$value  = isset( $config['meta_description_pixel_limit'] ) ? absint( $config['meta_description_pixel_limit'] ) : 920;
 
 		return max( 200, min( 2000, $value ) );
+	}
+
+	public function get_image_context_mode( $settings = null ) {
+		if ( null === $settings ) {
+			$settings = $this->all();
+		}
+
+		$mode          = isset( $settings['image_context_mode'] ) ? sanitize_text_field( $settings['image_context_mode'] ) : 'url';
+		$allowed_modes = [ 'none', 'base64', 'url' ];
+
+		return in_array( $mode, $allowed_modes, true ) ? $mode : 'url';
 	}
 
 	public function is_response_format_compat_enabled( $settings = null ) {

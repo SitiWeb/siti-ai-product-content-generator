@@ -125,7 +125,7 @@ class Groq_AI_Prompt_Builder {
 		return $normalized;
 	}
 
-	public function build_product_context_block( $post_id, $fields ) {
+	public function build_product_context_block( $post_id, $fields, $image_mode = 'url' ) {
 		$post_id = absint( $post_id );
 
 		if ( ! $post_id ) {
@@ -159,6 +159,13 @@ class Groq_AI_Prompt_Builder {
 			$attributes = $this->get_product_attributes_text( $post_id );
 			if ( $attributes ) {
 				$parts[] = sprintf( __( 'Attributen: %s', 'groq-ai-product-text' ), $attributes );
+			}
+		}
+
+		if ( ! empty( $fields['images'] ) && 'url' === $image_mode ) {
+			$images = $this->get_product_images_text( $post_id );
+			if ( $images ) {
+				$parts[] = sprintf( __( 'Afbeeldingen: %s', 'groq-ai-product-text' ), $images );
 			}
 		}
 
@@ -349,5 +356,145 @@ class Groq_AI_Prompt_Builder {
 		}
 
 		return implode( '; ', $lines );
+	}
+
+	private function get_product_images_text( $post_id ) {
+		$image_ids = $this->get_product_image_ids( $post_id );
+
+		if ( empty( $image_ids ) ) {
+			return '';
+		}
+
+		$entries = [];
+
+		foreach ( $image_ids as $index => $attachment_id ) {
+			$descriptor = $this->describe_product_image( $attachment_id, $index + 1 );
+			if ( ! $descriptor ) {
+				continue;
+			}
+
+			$entries[] = sprintf( '%s - %s', $descriptor['label'], $descriptor['url'] );
+		}
+
+		return implode( '; ', array_filter( $entries ) );
+	}
+
+	public function get_product_image_payloads( $post_id, $limit = 3, $max_filesize = 1572864 ) {
+		$image_ids = array_slice( $this->get_product_image_ids( $post_id ), 0, max( 1, (int) $limit ) );
+
+		if ( empty( $image_ids ) ) {
+			return [];
+		}
+
+		$payloads = [];
+
+		foreach ( $image_ids as $index => $attachment_id ) {
+			$descriptor = $this->describe_product_image( $attachment_id, $index + 1 );
+			if ( ! $descriptor || empty( $descriptor['path'] ) ) {
+				continue;
+			}
+
+			$path = $descriptor['path'];
+
+			if ( ! file_exists( $path ) || ! is_readable( $path ) ) {
+				continue;
+			}
+
+			$filesize = filesize( $path );
+			if ( false !== $filesize && $filesize > $max_filesize ) {
+				continue;
+			}
+
+			$data = @file_get_contents( $path );
+			if ( false === $data ) {
+				continue;
+			}
+
+			$payloads[] = [
+				'attachment_id' => $attachment_id,
+				'label'         => $descriptor['label'],
+				'mime_type'     => $descriptor['mime_type'],
+				'data'          => base64_encode( $data ),
+				'url'           => $descriptor['url'],
+			];
+		}
+
+		return $payloads;
+	}
+
+	public function get_product_image_count( $post_id ) {
+		return count( $this->get_product_image_ids( $post_id ) );
+	}
+
+	private function get_product_image_ids( $post_id ) {
+		$post_id = absint( $post_id );
+
+		if ( ! $post_id ) {
+			return [];
+		}
+
+		$image_ids = [];
+
+		$featured_id = get_post_thumbnail_id( $post_id );
+		if ( $featured_id ) {
+			$image_ids[] = $featured_id;
+		}
+
+		$gallery_ids = [];
+		if ( function_exists( 'wc_get_product' ) ) {
+			$product = wc_get_product( $post_id );
+			if ( $product ) {
+				$gallery_ids = (array) $product->get_gallery_image_ids();
+			}
+		}
+
+		if ( empty( $gallery_ids ) ) {
+			$raw_gallery = get_post_meta( $post_id, '_product_image_gallery', true );
+			if ( is_string( $raw_gallery ) && '' !== trim( $raw_gallery ) ) {
+				$gallery_ids = array_filter( array_map( 'absint', explode( ',', $raw_gallery ) ) );
+			}
+		}
+
+		if ( ! empty( $gallery_ids ) ) {
+			$image_ids = array_merge( $image_ids, $gallery_ids );
+		}
+
+		return array_values( array_unique( array_filter( array_map( 'absint', $image_ids ) ) ) );
+	}
+
+	private function describe_product_image( $attachment_id, $position ) {
+		$url = wp_get_attachment_url( $attachment_id );
+
+		if ( ! $url ) {
+			return null;
+		}
+
+		$label = trim( (string) get_post_meta( $attachment_id, '_wp_attachment_image_alt', true ) );
+		if ( '' === $label ) {
+			$label = get_the_title( $attachment_id );
+		}
+		$label = trim( wp_strip_all_tags( (string) $label ) );
+
+		if ( '' === $label ) {
+			$label = sprintf( __( 'Afbeelding %d', 'groq-ai-product-text' ), $position );
+		}
+
+		$path = get_attached_file( $attachment_id );
+		$mime = get_post_mime_type( $attachment_id );
+		if ( ! $mime && $path ) {
+			$mime = wp_get_image_mime( $path );
+		}
+
+		if ( $mime && 0 !== strpos( $mime, 'image/' ) ) {
+			$mime = '';
+		}
+
+		return [
+			'attachment_id' => $attachment_id,
+			'label'         => $label,
+			'url'           => esc_url_raw( $url ),
+			'path'          => $path,
+			'mime_type'     => $mime ? $mime : 'image/jpeg',
+		];
 	}
 }

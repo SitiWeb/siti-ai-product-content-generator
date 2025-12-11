@@ -18,4 +18,6 @@ interface Groq_AI_Provider_Interface {
 	public function fetch_live_models( $api_key );
 
 	public function supports_response_format();
+
+	public function supports_image_context();
 }

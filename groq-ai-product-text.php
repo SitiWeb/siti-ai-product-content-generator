@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SitiAI Product Teksten
  * Description: Genereer productteksten met diverse AI-aanbieders rechtstreeks vanuit WooCommerce.
- * Version: 1.1.1
+ * Version: 1.2.0
  * Author: SitiAI
  */
 
@@ -32,6 +32,7 @@ if ( ! defined( 'GROQ_AI_DEBUG_TRACE_ADDED' ) && defined( 'WP_DEBUG' ) && WP_DEB
 }
 
 require_once __DIR__ . '/includes/Core/class-groq-ai-service-container.php';
+require_once __DIR__ . '/includes/Core/class-groq-ai-model-exclusions.php';
 require_once __DIR__ . '/includes/Core/class-groq-ai-ajax-controller.php';
 require_once __DIR__ . '/includes/Contracts/interface-groq-ai-provider.php';
 require_once __DIR__ . '/includes/Providers/class-groq-ai-abstract-openai-provider.php';
@@ -60,6 +61,7 @@ $updater->initialize();
 final class Groq_AI_Product_Text_Plugin {
 	const OPTION_KEY = 'groq_ai_product_text_settings';
 	const CONVERSATION_OPTION_KEY = 'groq_ai_product_text_conversations';
+	const MODELS_CACHE_OPTION_KEY = 'groq_ai_product_text_models';
 
 	private static $instance = null;
 
@@ -260,6 +262,10 @@ final class Groq_AI_Product_Text_Plugin {
 		return $this->get_settings_manager()->is_response_format_compat_enabled( $settings );
 	}
 
+	public function get_image_context_mode( $settings = null ) {
+		return $this->get_settings_manager()->get_image_context_mode( $settings );
+	}
+
 	public function should_use_response_format( Groq_AI_Provider_Interface $provider, $settings ) {
 		return ! $this->is_response_format_compat_enabled( $settings ) && $provider->supports_response_format();
 	}
@@ -289,7 +295,78 @@ final class Groq_AI_Product_Text_Plugin {
 	}
 
 	public function get_selected_model( Groq_AI_Provider_Interface $provider, $settings ) {
-		return ! empty( $settings['model'] ) ? $settings['model'] : $provider->get_default_model();
+		$provider_key = $provider->get_key();
+		$model        = ! empty( $settings['model'] ) ? $settings['model'] : '';
+		$model        = Groq_AI_Model_Exclusions::ensure_allowed( $provider_key, $model );
+
+		if ( '' === $model ) {
+			$default       = Groq_AI_Model_Exclusions::ensure_allowed( $provider_key, $provider->get_default_model() );
+			if ( '' !== $default ) {
+				return $default;
+			}
+
+			$available = Groq_AI_Model_Exclusions::filter_models( $provider_key, $provider->get_available_models() );
+			if ( ! empty( $available ) ) {
+				return $available[0];
+			}
+		}
+
+		return $model;
+	}
+
+	public function get_cached_models_for_provider( $provider ) {
+		$provider = sanitize_key( (string) $provider );
+		$cache    = $this->get_models_cache();
+
+		return isset( $cache[ $provider ] ) ? $cache[ $provider ] : [];
+	}
+
+	public function update_cached_models_for_provider( $provider, $models ) {
+		$provider = sanitize_key( (string) $provider );
+		$models   = $this->sanitize_models_list( $models );
+
+		$cache = $this->get_models_cache();
+		$cache[ $provider ] = $models;
+
+		update_option( self::MODELS_CACHE_OPTION_KEY, $cache );
+
+		return $models;
+	}
+
+	private function get_models_cache() {
+		$cache = get_option( self::MODELS_CACHE_OPTION_KEY, [] );
+
+		if ( ! is_array( $cache ) ) {
+			$cache = [];
+		}
+
+		foreach ( $cache as $provider => $models ) {
+			$cache[ $provider ] = $this->sanitize_models_list( $models );
+		}
+
+		return $cache;
+	}
+
+	private function sanitize_models_list( $models ) {
+		if ( ! is_array( $models ) ) {
+			return [];
+		}
+
+		$models = array_map( 'sanitize_text_field', $models );
+		$models = array_filter(
+			$models,
+			function ( $model ) {
+				return '' !== $model;
+			}
+		);
+
+		$models = array_values( array_unique( $models ) );
+
+		if ( ! empty( $models ) ) {
+			sort( $models, SORT_NATURAL | SORT_FLAG_CASE );
+		}
+
+		return $models;
 	}
 
 	public function log_debug( $message, $context = [] ) {

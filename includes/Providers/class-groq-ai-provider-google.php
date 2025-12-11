@@ -33,6 +33,10 @@ class Groq_AI_Provider_Google implements Groq_AI_Provider_Interface {
 		return false;
 	}
 
+	public function supports_image_context() {
+		return true;
+	}
+
 	public function fetch_live_models( $api_key ) {
 		$endpoint = add_query_arg(
 			[ 'key' => $api_key, 'pageSize' => 100 ],
@@ -92,15 +96,59 @@ class Groq_AI_Provider_Google implements Groq_AI_Provider_Interface {
 			sprintf( 'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent', rawurlencode( $model ) )
 		);
 
+		$image_context = isset( $args['image_context'] ) && is_array( $args['image_context'] ) ? $args['image_context'] : [];
+
+		$parts = [];
+
+		if ( '' !== trim( (string) $system_prompt ) ) {
+			$parts[] = [
+				'text' => $system_prompt,
+			];
+		}
+
+		if ( '' !== trim( (string) $prompt ) ) {
+			$parts[] = [
+				'text' => $prompt,
+			];
+		}
+
+		if ( ! empty( $image_context ) ) {
+			foreach ( $image_context as $image ) {
+				if ( empty( $image['data'] ) ) {
+					continue;
+				}
+
+				$label = isset( $image['label'] ) ? trim( (string) $image['label'] ) : '';
+				if ( '' !== $label ) {
+					$parts[] = [
+						'text' => sprintf(
+							/* translators: %s: image label */
+							__( 'Contextafbeelding: %s', 'groq-ai-product-text' ),
+							$label
+						),
+					];
+				}
+
+				$parts[] = [
+					'inline_data' => [
+						'mime_type' => ! empty( $image['mime_type'] ) ? $image['mime_type'] : 'image/jpeg',
+						'data'      => $image['data'],
+					],
+				];
+			}
+		}
+
+		if ( empty( $parts ) ) {
+			$parts[] = [
+				'text' => $prompt,
+			];
+		}
+
 		$payload = [
 			'contents'         => [
 				[
 					'role'  => 'user',
-					'parts' => [
-						[
-							'text' => $system_prompt . "\n\n" . $prompt,
-						],
-					],
+					'parts' => $parts,
 				],
 			],
 			'generationConfig' => [

@@ -88,6 +88,14 @@ class SitiWebUpdater {
 
 				$this->get_repository_info(); // Get the repo info
 
+				if ( empty( $this->github_response ) || empty( $this->github_response['tag_name'] ) ) {
+					return $transient;
+				}
+
+				if ( empty( $checked[ $this->basename ] ) ) {
+					return $transient;
+				}
+
 				$out_of_date = version_compare( $this->github_response['tag_name'], $checked[ $this->basename ], 'gt' ); // Check if we're out of date
 
 				if( $out_of_date ) {
@@ -114,10 +122,14 @@ class SitiWebUpdater {
 	public function plugin_popup( $result, $action, $args ) {
 
 		if( ! empty( $args->slug ) ) { // If there is a slug
-			
+
 			if( $args->slug == current( explode( '/' , $this->basename ) ) ) { // And it's our slug
 
 				$this->get_repository_info(); // Get our repo info
+
+				if ( empty( $this->github_response ) || empty( $this->github_response['tag_name'] ) ) {
+					return $result;
+				}
 
 				// Set it to an array
 				$plugin = array(

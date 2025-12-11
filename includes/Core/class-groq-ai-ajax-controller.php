@@ -36,8 +36,42 @@ class Groq_AI_Ajax_Controller {
 		$system_prompt        = $prompt_builder->build_system_prompt( $settings, $conversation_id );
 		$model                = $this->plugin->get_selected_model( $provider, $settings );
 		$context_fields       = $prompt_builder->parse_context_fields_from_request( isset( $_POST['context_fields'] ) ? $_POST['context_fields'] : '', $settings );
-		$product_context_text = $prompt_builder->build_product_context_block( $post_id, $context_fields );
+		$image_context_mode   = $this->plugin->get_image_context_mode( $settings );
+
+		if ( 'none' === $image_context_mode ) {
+			$context_fields['images'] = false;
+		}
+
+		$image_context_enabled = ! empty( $context_fields['images'] );
+		$use_base64_payloads   = $image_context_enabled && 'base64' === $image_context_mode && $provider->supports_image_context();
+		$image_context_count   = $image_context_enabled ? $prompt_builder->get_product_image_count( $post_id ) : 0;
+
+		$prompt_image_mode = 'none';
+		if ( $image_context_enabled ) {
+			if ( $use_base64_payloads ) {
+				$prompt_image_mode = 'base64';
+			} else {
+				$prompt_image_mode = 'url';
+			}
+
+			if ( 'base64' === $image_context_mode && ! $provider->supports_image_context() ) {
+				$prompt_image_mode = 'url';
+			}
+		}
+
+		$product_context_text = $prompt_builder->build_product_context_block( $post_id, $context_fields, $prompt_image_mode );
+		$image_context_payloads = [];
+		if ( $use_base64_payloads ) {
+			$image_context_payloads = $prompt_builder->get_product_image_payloads( $post_id );
+		}
 		$prompt_with_context  = $prompt_builder->prepend_context_to_prompt( $prompt, $product_context_text );
+
+		$image_context_meta = [
+			'requested_mode' => $image_context_mode,
+			'effective_mode' => $prompt_image_mode,
+			'available'      => $image_context_count,
+			'base64_sent'    => $use_base64_payloads ? count( $image_context_payloads ) : 0,
+		];
 
 		$response_format  = null;
 		$use_response_format = $this->plugin->should_use_response_format( $provider, $settings );
@@ -57,6 +91,7 @@ class Groq_AI_Ajax_Controller {
 				'temperature'     => 0.7,
 				'conversation_id' => $conversation_id,
 				'response_format' => $response_format,
+				'image_context'   => $image_context_payloads,
 			]
 		);
 
@@ -67,7 +102,9 @@ class Groq_AI_Ajax_Controller {
 					'model'         => $model,
 					'prompt'        => $final_prompt,
 					'response'      => '',
-					'usage'         => [],
+					'usage'         => [
+						'image_context' => $image_context_meta,
+					],
 					'post_id'       => $post_id,
 					'status'        => 'error',
 					'error_message' => $result->get_error_message(),
@@ -78,6 +115,10 @@ class Groq_AI_Ajax_Controller {
 
 		$response_text = $this->extract_content_text( $result );
 		$response_usage = is_array( $result ) && isset( $result['usage'] ) ? $result['usage'] : [];
+		if ( ! is_array( $response_usage ) ) {
+			$response_usage = [];
+		}
+		$response_usage['image_context'] = $image_context_meta;
 
 		$response = $prompt_builder->parse_structured_response( $response_text, $settings );
 
@@ -143,7 +184,10 @@ class Groq_AI_Ajax_Controller {
 			wp_send_json_error( [ 'message' => $result->get_error_message() ], 500 );
 		}
 
-		wp_send_json_success( [ 'models' => array_values( array_unique( $result ) ) ] );
+		$models = Groq_AI_Model_Exclusions::filter_models( $provider_key, array_values( array_unique( $result ) ) );
+		$models = $this->plugin->update_cached_models_for_provider( $provider_key, $models );
+
+		wp_send_json_success( [ 'models' => $models ] );
 	}
 
 	private function extract_content_text( $result ) {

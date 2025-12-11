@@ -18,6 +18,7 @@
 		const modelSelect = document.getElementById('groq-ai-model-select');
 		const refreshButton = document.getElementById('groq-ai-refresh-models');
 		const refreshStatus = document.getElementById('groq-ai-refresh-models-status');
+		const excludedModels = data.excludedModels || {};
 		let currentModelValue = (modelSelect && modelSelect.dataset.currentModel) || data.currentModel || '';
 
 		function toggleProviderRows() {
@@ -42,6 +43,32 @@
 			});
 		}
 
+		function isModelAllowed(model, providerOverride) {
+			if (!model) {
+				return true;
+			}
+
+			const provider = providerOverride || (providerSelect ? providerSelect.value : data.currentProvider);
+			if (!provider || !excludedModels[provider]) {
+				return true;
+			}
+
+			return excludedModels[provider].indexOf(model) === -1;
+		}
+
+		function ensureCurrentModelAllowed(providerOverride) {
+			if (!currentModelValue) {
+				return;
+			}
+
+			if (!isModelAllowed(currentModelValue, providerOverride)) {
+				currentModelValue = '';
+				if (modelSelect) {
+					modelSelect.dataset.currentModel = '';
+				}
+			}
+		}
+
 		function buildModelOptions() {
 			if (!modelSelect || !data.providers) {
 				return;
@@ -53,6 +80,8 @@
 				return;
 			}
 
+			ensureCurrentModelAllowed(provider);
+
 			const models = Array.isArray(providerData.models) ? providerData.models : [];
 			const frag = document.createDocumentFragment();
 			const placeholder = document.createElement('option');
@@ -63,6 +92,9 @@
 
 			let hasCurrent = false;
 			models.forEach(function (model) {
+				if (!isModelAllowed(model, provider)) {
+					return;
+				}
 				const option = document.createElement('option');
 				option.value = model;
 				option.textContent = model;
@@ -72,7 +104,7 @@
 				frag.appendChild(option);
 			});
 
-			if (currentModelValue && !hasCurrent) {
+			if (currentModelValue && !hasCurrent && isModelAllowed(currentModelValue, provider)) {
 				const extraOption = document.createElement('option');
 				extraOption.value = currentModelValue;
 				extraOption.textContent = currentModelValue;

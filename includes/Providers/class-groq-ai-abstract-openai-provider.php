@@ -138,4 +138,8 @@ abstract class Groq_AI_Abstract_OpenAI_Provider implements Groq_AI_Provider_Inte
 		$field = $this->get_option_key();
 		return isset( $settings[ $field ] ) ? $settings[ $field ] : '';
 	}
+
+	public function supports_image_context() {
+		return false;
+	}
 }
