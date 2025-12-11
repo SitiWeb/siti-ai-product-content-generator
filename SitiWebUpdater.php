@@ -66,6 +66,14 @@ class SitiWebUpdater {
 	    }
 	}
 
+	private function get_latest_version_from_response() {
+		if ( empty( $this->github_response['tag_name'] ) ) {
+			return null;
+		}
+
+		return ltrim( $this->github_response['tag_name'], 'vV' );
+	}
+
 	public function initialize() {
 		add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'modify_transient' ), 10, 1 );
 		add_filter( 'plugins_api', array( $this, 'plugin_popup' ), 10, 3);
@@ -88,15 +96,13 @@ class SitiWebUpdater {
 
 				$this->get_repository_info(); // Get the repo info
 
-				if ( empty( $this->github_response ) || empty( $this->github_response['tag_name'] ) ) {
+				$latest_version = $this->get_latest_version_from_response();
+
+				if ( null === $latest_version ) {
 					return $transient;
 				}
 
-				if ( empty( $checked[ $this->basename ] ) ) {
-					return $transient;
-				}
-
-				$out_of_date = version_compare( $this->github_response['tag_name'], $checked[ $this->basename ], 'gt' ); // Check if we're out of date
+				$out_of_date = version_compare( $latest_version, $checked[ $this->basename ], 'gt' ); // Check if we're out of date
 
 				if( $out_of_date ) {
 
@@ -108,7 +114,7 @@ class SitiWebUpdater {
 						'url' => $this->plugin["PluginURI"],
 						'slug' => $slug,
 						'package' => $new_files,
-						'new_version' => $this->github_response['tag_name']
+						'new_version' => $latest_version
 					);
 
 					$transient->response[$this->basename] = (object) $plugin; // Return it in response
@@ -122,12 +128,13 @@ class SitiWebUpdater {
 	public function plugin_popup( $result, $action, $args ) {
 
 		if( ! empty( $args->slug ) ) { // If there is a slug
-
+			
 			if( $args->slug == current( explode( '/' , $this->basename ) ) ) { // And it's our slug
 
 				$this->get_repository_info(); // Get our repo info
+				$latest_version = $this->get_latest_version_from_response();
 
-				if ( empty( $this->github_response ) || empty( $this->github_response['tag_name'] ) ) {
+				if ( null === $latest_version ) {
 					return $result;
 				}
 
@@ -141,7 +148,7 @@ class SitiWebUpdater {
 					'num_ratings'				=> '10823',
 					'downloaded'				=> '14249',
 					'added'							=> '2016-01-05',
-					'version'			=> $this->github_response['tag_name'],
+					'version'			=> $latest_version,
 					'author'			=> $this->plugin["AuthorName"],
 					'author_profile'	=> $this->plugin["AuthorURI"],
 					'last_updated'		=> $this->github_response['published_at'],
