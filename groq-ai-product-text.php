@@ -2,8 +2,10 @@
 /**
  * Plugin Name: SitiAI Product Teksten
  * Description: Genereer productteksten met diverse AI-aanbieders rechtstreeks vanuit WooCommerce.
- * Version: 1.2.2
+ * Version: 1.3.0
  * Author: SitiAI
+ * Text Domain: siti-ai-product-content-generator
+ * Domain Path: /languages
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -25,6 +27,14 @@ if ( ! defined( 'GROQ_AI_PRODUCT_TEXT_VERSION' ) ) {
 
 	$groq_ai_version = isset( $groq_ai_plugin_data['Version'] ) && $groq_ai_plugin_data['Version'] ? $groq_ai_plugin_data['Version'] : '1.0.0';
 	define( 'GROQ_AI_PRODUCT_TEXT_VERSION', $groq_ai_version );
+}
+
+if ( ! defined( 'GROQ_AI_PRODUCT_TEXT_DOMAIN' ) ) {
+	define( 'GROQ_AI_PRODUCT_TEXT_DOMAIN', 'siti-ai-product-content-generator' );
+}
+
+if ( ! defined( 'GROQ_AI_PRODUCT_TEXT_LEGACY_DOMAIN' ) ) {
+	define( 'GROQ_AI_PRODUCT_TEXT_LEGACY_DOMAIN', 'groq-ai-product-text' );
 }
 
 if ( ! defined( 'GROQ_AI_DEBUG_TRACE_ADDED' ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
@@ -63,6 +73,9 @@ final class Groq_AI_Product_Text_Plugin {
 	const CONVERSATION_OPTION_KEY = 'groq_ai_product_text_conversations';
 	const MODELS_CACHE_OPTION_KEY = 'groq_ai_product_text_models';
 
+	/** @var bool */
+	private $textdomain_loaded = false;
+
 	private static $instance = null;
 
 	/** @var Groq_AI_Service_Container */
@@ -91,8 +104,34 @@ final class Groq_AI_Product_Text_Plugin {
 		$this->settings_page    = new Groq_AI_Product_Text_Settings_Page( $this, $this->get_provider_manager() );
 		$this->product_ui       = new Groq_AI_Product_Text_Product_UI( $this );
 
+		add_action( 'plugins_loaded', [ $this, 'maybe_load_textdomain_early' ], 0 );
+		add_action( 'init', [ $this, 'load_textdomain' ] );
 		add_action( 'plugins_loaded', [ $this, 'maybe_create_logs_table' ] );
 		add_action( 'load-plugins.php', [ $this, 'maybe_deactivate_if_woocommerce_missing' ] );
+	}
+
+	public function load_textdomain() {
+		if ( $this->textdomain_loaded ) {
+			return;
+		}
+
+		$relative_path = dirname( plugin_basename( GROQ_AI_PRODUCT_TEXT_FILE ) ) . '/languages';
+
+		load_plugin_textdomain( GROQ_AI_PRODUCT_TEXT_DOMAIN, false, $relative_path );
+
+		if ( defined( 'GROQ_AI_PRODUCT_TEXT_LEGACY_DOMAIN' ) && GROQ_AI_PRODUCT_TEXT_LEGACY_DOMAIN !== GROQ_AI_PRODUCT_TEXT_DOMAIN ) {
+			load_plugin_textdomain( GROQ_AI_PRODUCT_TEXT_LEGACY_DOMAIN, false, $relative_path );
+		}
+
+		$this->textdomain_loaded = true;
+	}
+
+	public function maybe_load_textdomain_early() {
+		if ( did_action( 'init' ) ) {
+			return;
+		}
+
+		$this->load_textdomain();
 	}
 
 	private function register_services() {
@@ -198,7 +237,7 @@ final class Groq_AI_Product_Text_Plugin {
 		?>
 		<div class="notice notice-error">
 			<p>
-				<?php esc_html_e( 'SitiAI Product Teksten vereist WooCommerce en is gedeactiveerd omdat WooCommerce niet actief is.', 'groq-ai-product-text' ); ?>
+				<?php esc_html_e( 'SitiAI Product Teksten vereist WooCommerce en is gedeactiveerd omdat WooCommerce niet actief is.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 			</p>
 		</div>
 		<?php
@@ -208,15 +247,15 @@ final class Groq_AI_Product_Text_Plugin {
 		$parts = [];
 
 		if ( ! empty( $settings['store_context'] ) ) {
-			$parts[] = sprintf( __( 'Winkelcontext: %s', 'groq-ai-product-text' ), $settings['store_context'] );
+			$parts[] = sprintf( __( 'Winkelcontext: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $settings['store_context'] );
 		}
 
 		if ( ! empty( $settings['default_prompt'] ) ) {
-			$parts[] = sprintf( __( 'Standaard prompt: %s', 'groq-ai-product-text' ), $settings['default_prompt'] );
+			$parts[] = sprintf( __( 'Standaard prompt: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $settings['default_prompt'] );
 		}
 
 		if ( empty( $parts ) ) {
-			return __( 'Nog geen promptinformatie opgeslagen.', 'groq-ai-product-text' );
+			return __( 'Nog geen promptinformatie opgeslagen.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
 		}
 
 		return implode( "\n\n", $parts );
@@ -264,6 +303,10 @@ final class Groq_AI_Product_Text_Plugin {
 
 	public function get_image_context_mode( $settings = null ) {
 		return $this->get_settings_manager()->get_image_context_mode( $settings );
+	}
+
+	public function get_image_context_limit( $settings = null ) {
+		return $this->get_settings_manager()->get_image_context_limit( $settings );
 	}
 
 	public function should_use_response_format( Groq_AI_Provider_Interface $provider, $settings ) {

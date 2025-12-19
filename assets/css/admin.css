@@ -123,6 +123,36 @@
 	width: 100%;
 }
 
+.groq-ai-title-suggestions {
+	border: 1px dashed #dcdcde;
+	border-radius: 4px;
+	padding: 8px;
+	background: #fefefe;
+	margin-top: 8px;
+}
+
+.groq-ai-title-suggestions__options {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-top: 6px;
+}
+
+.groq-ai-title-suggestions__option {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+}
+
+.groq-ai-title-suggestions__option input[type='radio'] {
+	margin-top: 3px;
+}
+
+.groq-ai-title-suggestions__hint {
+	margin-top: 6px;
+	margin-bottom: 0;
+}
+
 .groq-ai-modal__raw {
 	margin-top: 16px;
 }

@@ -38,6 +38,7 @@ class Groq_AI_Settings_Manager {
 			'context_fields' => $this->get_default_context_fields(),
 			'modules'        => $this->get_default_modules_settings(),
 			'image_context_mode' => 'url',
+			'image_context_limit' => 3,
 			'response_format_compat' => false,
 		];
 
@@ -58,6 +59,9 @@ class Groq_AI_Settings_Manager {
 			$settings['context_fields']['images'] = true;
 			$settings['image_context_mode']       = 'url';
 		}
+
+		$limit = isset( $settings['image_context_limit'] ) ? $this->sanitize_image_context_limit_value( $settings['image_context_limit'] ) : 3;
+		$settings['image_context_limit'] = $limit;
 
 		return $settings;
 	}
@@ -80,6 +84,7 @@ class Groq_AI_Settings_Manager {
 			'context_fields' => $this->get_default_context_fields(),
 			'modules'        => $this->get_default_modules_settings(),
 			'image_context_mode' => 'url',
+			'image_context_limit' => 3,
 			'response_format_compat' => false,
 		];
 
@@ -104,6 +109,8 @@ class Groq_AI_Settings_Manager {
 			$image_mode = 'url';
 		}
 
+		$image_limit = isset( $input['image_context_limit'] ) ? $this->sanitize_image_context_limit_value( $input['image_context_limit'] ) : $defaults['image_context_limit'];
+
 		$context_fields = $this->normalize_context_fields( $context_posted ? $raw_input['context_fields'] : $defaults['context_fields'] );
 
 		if ( 'none' === $image_mode ) {
@@ -122,6 +129,7 @@ class Groq_AI_Settings_Manager {
 			'google_api_key' => sanitize_text_field( $input['google_api_key'] ),
 			'response_format_compat' => ! empty( $raw_input['response_format_compat'] ),
 			'image_context_mode' => $image_mode,
+			'image_context_limit' => $image_limit,
 			'context_fields' => $context_fields,
 			'modules'        => $this->sanitize_modules_settings(
 				$modules_posted ? $raw_input['modules'] : [],
@@ -136,28 +144,28 @@ class Groq_AI_Settings_Manager {
 		if ( null === $this->context_field_definitions ) {
 			$this->context_field_definitions = [
 				'title'             => [
-					'label'       => __( 'Producttitel', 'groq-ai-product-text' ),
-					'description' => __( 'Voeg de huidige producttitel toe als context.', 'groq-ai-product-text' ),
+					'label'       => __( 'Producttitel', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					'description' => __( 'Voeg de huidige producttitel toe als context.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 					'default'     => true,
 				],
 				'short_description' => [
-					'label'       => __( 'Korte beschrijving', 'groq-ai-product-text' ),
-					'description' => __( 'Gebruik de bestaande korte beschrijving (indien aanwezig).', 'groq-ai-product-text' ),
+					'label'       => __( 'Korte beschrijving', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					'description' => __( 'Gebruik de bestaande korte beschrijving (indien aanwezig).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 					'default'     => true,
 				],
 				'description'       => [
-					'label'       => __( 'Volledige beschrijving', 'groq-ai-product-text' ),
-					'description' => __( 'Stuurt de huidige productbeschrijving mee als bronmateriaal.', 'groq-ai-product-text' ),
+					'label'       => __( 'Volledige beschrijving', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					'description' => __( 'Stuurt de huidige productbeschrijving mee als bronmateriaal.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 					'default'     => true,
 				],
 				'attributes'        => [
-					'label'       => __( 'Attributen', 'groq-ai-product-text' ),
-					'description' => __( 'Voeg gestructureerde productattributen toe (zoals kleur, maat, materiaal).', 'groq-ai-product-text' ),
+					'label'       => __( 'Attributen', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					'description' => __( 'Voeg gestructureerde productattributen toe (zoals kleur, maat, materiaal).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 					'default'     => false,
 				],
 				'images'            => [
-					'label'       => __( 'Afbeeldingen', 'groq-ai-product-text' ),
-					'description' => __( 'Voeg een korte lijst toe met productafbeeldingen (beschrijving + URL).', 'groq-ai-product-text' ),
+					'label'       => __( 'Afbeeldingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					'description' => __( 'Voeg een korte lijst toe met productafbeeldingen (beschrijving + URL).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 					'default'     => false,
 				],
 			];
@@ -268,6 +276,16 @@ class Groq_AI_Settings_Manager {
 		return in_array( $mode, $allowed_modes, true ) ? $mode : 'url';
 	}
 
+	public function get_image_context_limit( $settings = null ) {
+		if ( null === $settings ) {
+			$settings = $this->all();
+		}
+
+		$limit = isset( $settings['image_context_limit'] ) ? $settings['image_context_limit'] : 3;
+
+		return $this->sanitize_image_context_limit_value( $limit );
+	}
+
 	public function is_response_format_compat_enabled( $settings = null ) {
 		if ( null === $settings ) {
 			$settings = $this->all();
@@ -340,5 +358,15 @@ class Groq_AI_Settings_Manager {
 		}
 
 		return $result;
+	}
+
+	private function sanitize_image_context_limit_value( $value ) {
+		$limit = absint( $value );
+
+		if ( $limit <= 0 ) {
+			$limit = 1;
+		}
+
+		return min( 10, $limit );
 	}
 }

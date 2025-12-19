@@ -6,7 +6,7 @@ class Groq_AI_Provider_Groq extends Groq_AI_Abstract_OpenAI_Provider {
 	}
 
 	public function get_label() {
-		return __( 'Groq', 'groq-ai-product-text' );
+		return __( 'Groq', GROQ_AI_PRODUCT_TEXT_DOMAIN );
 	}
 
 	public function get_default_model() {

@@ -13,7 +13,7 @@ class Groq_AI_Ajax_Controller {
 
 	public function handle_generate_text() {
 		if ( ! current_user_can( 'edit_products' ) ) {
-			wp_send_json_error( [ 'message' => __( 'Je hebt geen toestemming voor deze actie.', 'groq-ai-product-text' ) ], 403 );
+			wp_send_json_error( [ 'message' => __( 'Je hebt geen toestemming voor deze actie.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ], 403 );
 		}
 
 		check_ajax_referer( 'groq_ai_generate', 'nonce' );
@@ -37,6 +37,7 @@ class Groq_AI_Ajax_Controller {
 		$model                = $this->plugin->get_selected_model( $provider, $settings );
 		$context_fields       = $prompt_builder->parse_context_fields_from_request( isset( $_POST['context_fields'] ) ? $_POST['context_fields'] : '', $settings );
 		$image_context_mode   = $this->plugin->get_image_context_mode( $settings );
+		$image_context_limit  = $this->plugin->get_image_context_limit( $settings );
 
 		if ( 'none' === $image_context_mode ) {
 			$context_fields['images'] = false;
@@ -44,7 +45,8 @@ class Groq_AI_Ajax_Controller {
 
 		$image_context_enabled = ! empty( $context_fields['images'] );
 		$use_base64_payloads   = $image_context_enabled && 'base64' === $image_context_mode && $provider->supports_image_context();
-		$image_context_count   = $image_context_enabled ? $prompt_builder->get_product_image_count( $post_id ) : 0;
+		$total_image_count     = $image_context_enabled ? $prompt_builder->get_product_image_count( $post_id ) : 0;
+		$image_context_count   = $image_context_enabled ? min( $image_context_limit, $total_image_count ) : 0;
 
 		$prompt_image_mode = 'none';
 		if ( $image_context_enabled ) {
@@ -59,17 +61,19 @@ class Groq_AI_Ajax_Controller {
 			}
 		}
 
-		$product_context_text = $prompt_builder->build_product_context_block( $post_id, $context_fields, $prompt_image_mode );
+		$product_context_text = $prompt_builder->build_product_context_block( $post_id, $context_fields, $prompt_image_mode, $image_context_limit );
 		$image_context_payloads = [];
 		if ( $use_base64_payloads ) {
-			$image_context_payloads = $prompt_builder->get_product_image_payloads( $post_id );
+			$image_context_payloads = $prompt_builder->get_product_image_payloads( $post_id, $image_context_limit );
 		}
 		$prompt_with_context  = $prompt_builder->prepend_context_to_prompt( $prompt, $product_context_text );
 
 		$image_context_meta = [
 			'requested_mode' => $image_context_mode,
 			'effective_mode' => $prompt_image_mode,
-			'available'      => $image_context_count,
+			'limit'          => $image_context_limit,
+			'available'      => $total_image_count,
+			'used'           => $image_context_count,
 			'base64_sent'    => $use_base64_payloads ? count( $image_context_payloads ) : 0,
 		];
 
@@ -160,7 +164,7 @@ class Groq_AI_Ajax_Controller {
 
 	public function handle_refresh_models() {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( [ 'message' => __( 'Geen toestemming.', 'groq-ai-product-text' ) ], 403 );
+			wp_send_json_error( [ 'message' => __( 'Geen toestemming.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ], 403 );
 		}
 
 		check_ajax_referer( 'groq_ai_refresh_models', 'nonce' );
@@ -169,13 +173,13 @@ class Groq_AI_Ajax_Controller {
 		$api_key      = isset( $_POST['apiKey'] ) ? sanitize_text_field( wp_unslash( $_POST['apiKey'] ) ) : '';
 
 		if ( empty( $provider_key ) || empty( $api_key ) ) {
-			wp_send_json_error( [ 'message' => __( 'Provider en API-sleutel zijn verplicht.', 'groq-ai-product-text' ) ], 400 );
+			wp_send_json_error( [ 'message' => __( 'Provider en API-sleutel zijn verplicht.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ], 400 );
 		}
 
 		$provider = $this->plugin->get_provider_manager()->get_provider( $provider_key );
 
 		if ( ! $provider || ! $provider->supports_live_models() ) {
-			wp_send_json_error( [ 'message' => __( 'Deze aanbieder ondersteunt het ophalen van modellen niet.', 'groq-ai-product-text' ) ], 400 );
+			wp_send_json_error( [ 'message' => __( 'Deze aanbieder ondersteunt het ophalen van modellen niet.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ], 400 );
 		}
 
 		$result = $provider->fetch_live_models( $api_key );

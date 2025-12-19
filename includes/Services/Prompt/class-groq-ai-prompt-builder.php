@@ -13,17 +13,17 @@ class Groq_AI_Prompt_Builder {
 
 	public function build_system_prompt( $settings, $conversation_id ) {
 		$context          = isset( $settings['store_context'] ) ? trim( $settings['store_context'] ) : '';
-		$base_instruction = __( 'Je bent een copywriter voor een WooCommerce winkel en schrijft overtuigende productbeschrijvingen.', 'groq-ai-product-text' );
+		$base_instruction = __( 'Je bent een copywriter voor een WooCommerce winkel en schrijft overtuigende productbeschrijvingen.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
 
 		if ( $context ) {
 			$base_instruction = sprintf(
-				__( 'Je bent een copywriter voor een WooCommerce winkel. Gebruik de volgende context indien beschikbaar: %s', 'groq-ai-product-text' ),
+				__( 'Je bent een copywriter voor een WooCommerce winkel. Gebruik de volgende context indien beschikbaar: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 				$context
 			);
 		}
 
 		return sprintf(
-			__( 'Conversatie-ID: %1$s. %2$s', 'groq-ai-product-text' ),
+			__( 'Conversatie-ID: %1$s. %2$s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			$conversation_id,
 			$base_instruction
 		);
@@ -46,7 +46,7 @@ class Groq_AI_Prompt_Builder {
 
 	public function parse_structured_response( $raw, $settings = null ) {
 		if ( empty( $raw ) ) {
-			return new WP_Error( 'groq_ai_empty_response', __( 'Geen data ontvangen van de AI.', 'groq-ai-product-text' ) );
+			return new WP_Error( 'groq_ai_empty_response', __( 'Geen data ontvangen van de AI.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
 		}
 
 		$clean = trim( $raw );
@@ -58,7 +58,7 @@ class Groq_AI_Prompt_Builder {
 		$decoded = json_decode( $clean, true );
 
 		if ( ! is_array( $decoded ) ) {
-			return new WP_Error( 'groq_ai_parse_error', __( 'Kon de AI-respons niet als JSON lezen. Probeer het opnieuw.', 'groq-ai-product-text' ) );
+			return new WP_Error( 'groq_ai_parse_error', __( 'Kon de AI-respons niet als JSON lezen. Probeer het opnieuw.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
 		}
 
 		$fields = [
@@ -66,6 +66,40 @@ class Groq_AI_Prompt_Builder {
 			'short_description' => trim( (string) ( $decoded['short_description'] ?? '' ) ),
 			'description'       => trim( (string) ( $decoded['description'] ?? '' ) ),
 		];
+
+		$title_suggestions = [];
+		if ( isset( $decoded['title_suggestions'] ) && is_array( $decoded['title_suggestions'] ) ) {
+			foreach ( $decoded['title_suggestions'] as $suggestion ) {
+				$suggestion = sanitize_text_field( (string) $suggestion );
+				$suggestion = trim( preg_replace( '/\s+/', ' ', $suggestion ) );
+
+				if ( '' === $suggestion ) {
+					continue;
+				}
+
+				$title_suggestions[] = $suggestion;
+
+				if ( count( $title_suggestions ) >= 3 ) {
+					break;
+				}
+			}
+		}
+
+		if ( empty( $title_suggestions ) && '' !== $fields['title'] ) {
+			$title_suggestions[] = $fields['title'];
+		}
+
+		if ( '' === $fields['title'] && ! empty( $title_suggestions ) ) {
+			$fields['title'] = $title_suggestions[0];
+		}
+
+		$fields['title_suggestions'] = $title_suggestions;
+
+		$slug_value = isset( $decoded['slug'] ) ? sanitize_title( $decoded['slug'] ) : '';
+		if ( '' === $slug_value && '' !== $fields['title'] ) {
+			$slug_value = sanitize_title( $fields['title'] );
+		}
+		$fields['slug'] = $slug_value;
 
 		if ( $this->settings_manager->is_module_enabled( 'rankmath', $settings ) ) {
 			$keyword_limit   = $this->settings_manager->get_rankmath_focus_keyword_limit( $settings );
@@ -98,8 +132,22 @@ class Groq_AI_Prompt_Builder {
 			$fields['focus_keywords']   = implode( ', ', $focus_keywords );
 		}
 
-		if ( implode( '', $fields ) === '' ) {
-			return new WP_Error( 'groq_ai_parse_error', __( 'De AI-respons bevatte geen bruikbare velden.', 'groq-ai-product-text' ) );
+		$primary_values = [
+			$fields['title'],
+			$fields['short_description'],
+			$fields['description'],
+		];
+
+		$has_primary_content = false;
+		foreach ( $primary_values as $value ) {
+			if ( '' !== trim( (string) $value ) ) {
+				$has_primary_content = true;
+				break;
+			}
+		}
+
+		if ( ! $has_primary_content ) {
+			return new WP_Error( 'groq_ai_parse_error', __( 'De AI-respons bevatte geen bruikbare velden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
 		}
 
 		return $fields;
@@ -125,7 +173,7 @@ class Groq_AI_Prompt_Builder {
 		return $normalized;
 	}
 
-	public function build_product_context_block( $post_id, $fields, $image_mode = 'url' ) {
+	public function build_product_context_block( $post_id, $fields, $image_mode = 'url', $image_limit = 3 ) {
 		$post_id = absint( $post_id );
 
 		if ( ! $post_id ) {
@@ -137,35 +185,35 @@ class Groq_AI_Prompt_Builder {
 		if ( ! empty( $fields['title'] ) ) {
 			$title = get_the_title( $post_id );
 			if ( $title ) {
-				$parts[] = sprintf( __( 'Titel: %s', 'groq-ai-product-text' ), wp_strip_all_tags( $title ) );
+				$parts[] = sprintf( __( 'Titel: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), wp_strip_all_tags( $title ) );
 			}
 		}
 
 		if ( ! empty( $fields['short_description'] ) ) {
 			$excerpt = get_post_field( 'post_excerpt', $post_id );
 			if ( $excerpt ) {
-				$parts[] = sprintf( __( 'Korte beschrijving: %s', 'groq-ai-product-text' ), wp_strip_all_tags( $excerpt ) );
+				$parts[] = sprintf( __( 'Korte beschrijving: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), wp_strip_all_tags( $excerpt ) );
 			}
 		}
 
 		if ( ! empty( $fields['description'] ) ) {
 			$content = get_post_field( 'post_content', $post_id );
 			if ( $content ) {
-				$parts[] = sprintf( __( 'Beschrijving: %s', 'groq-ai-product-text' ), wp_strip_all_tags( $content ) );
+				$parts[] = sprintf( __( 'Beschrijving: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), wp_strip_all_tags( $content ) );
 			}
 		}
 
 		if ( ! empty( $fields['attributes'] ) ) {
 			$attributes = $this->get_product_attributes_text( $post_id );
 			if ( $attributes ) {
-				$parts[] = sprintf( __( 'Attributen: %s', 'groq-ai-product-text' ), $attributes );
+				$parts[] = sprintf( __( 'Attributen: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $attributes );
 			}
 		}
 
 		if ( ! empty( $fields['images'] ) && 'url' === $image_mode ) {
-			$images = $this->get_product_images_text( $post_id );
+			$images = $this->get_product_images_text( $post_id, $image_limit );
 			if ( $images ) {
-				$parts[] = sprintf( __( 'Afbeeldingen: %s', 'groq-ai-product-text' ), $images );
+				$parts[] = sprintf( __( 'Afbeeldingen: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $images );
 			}
 		}
 
@@ -179,7 +227,7 @@ class Groq_AI_Prompt_Builder {
 			return $prompt;
 		}
 
-		$intro = __( 'Gebruik de volgende productcontext bij het schrijven:', 'groq-ai-product-text' );
+		$intro = __( 'Gebruik de volgende productcontext bij het schrijven:', GROQ_AI_PRODUCT_TEXT_DOMAIN );
 
 		return $intro . "\n" . $context . "\n\n" . $prompt;
 	}
@@ -191,19 +239,36 @@ class Groq_AI_Prompt_Builder {
 		$desc_pixels      = $this->settings_manager->get_rankmath_meta_description_pixel_limit( $settings );
 
 		$properties = [
+			'title_suggestions' => [
+				'type'        => 'array',
+				'description' => __( 'Exact drie korte producttitelvoorstellen in het Nederlands. Kies de beste ook als title.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'minItems'    => 3,
+				'maxItems'    => 3,
+				'items'       => [
+					'type'      => 'string',
+					'minLength' => 3,
+					'maxLength' => 120,
+				],
+			],
 			'title'             => [
 				'type'        => 'string',
-				'description' => __( 'Korte, overtuigende producttitel in het Nederlands.', 'groq-ai-product-text' ),
+				'description' => __( 'Korte, overtuigende producttitel in het Nederlands.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 				'minLength'   => 3,
+			],
+			'slug'              => [
+				'type'        => 'string',
+				'description' => __( 'Productslug voor de URL (alleen kleine letters, cijfers en koppeltekens).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'minLength'   => 3,
+				'pattern'     => '^[a-z0-9\\-]+$',
 			],
 			'short_description' => [
 				'type'        => 'string',
-				'description' => __( "Korte HTML-beschrijving in <p>-tags (maximaal 2 alinea's).", 'groq-ai-product-text' ),
+				'description' => __( "Korte HTML-beschrijving in <p>-tags (maximaal 2 alinea's).", GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 				'minLength'   => 10,
 			],
 			'description'       => [
 				'type'        => 'string',
-				'description' => __( 'Uitgebreide HTML-productbeschrijving met paragrafen en eventueel lijsten.', 'groq-ai-product-text' ),
+				'description' => __( 'Uitgebreide HTML-productbeschrijving met paragrafen en eventueel lijsten.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 				'minLength'   => 20,
 			],
 		];
@@ -213,7 +278,7 @@ class Groq_AI_Prompt_Builder {
 				'type'        => 'string',
 				'description' => sprintf(
 					/* translators: 1: maximum character count, 2: maximum pixels */
-					__( 'SEO-meta title (max. %1$d tekens en %2$d pixels).', 'groq-ai-product-text' ),
+					__( 'SEO-meta title (max. %1$d tekens en %2$d pixels).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 					60,
 					$title_pixels
 				),
@@ -223,7 +288,7 @@ class Groq_AI_Prompt_Builder {
 				'type'        => 'string',
 				'description' => sprintf(
 					/* translators: 1: maximum character count, 2: maximum pixels */
-					__( 'SEO-meta description (max. %1$d tekens en %2$d pixels).', 'groq-ai-product-text' ),
+					__( 'SEO-meta description (max. %1$d tekens en %2$d pixels).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 					160,
 					$desc_pixels
 				),
@@ -231,7 +296,7 @@ class Groq_AI_Prompt_Builder {
 			];
 			$properties['focus_keywords'] = [
 				'type'        => 'array',
-				'description' => __( 'Lijst met korte zoekwoorden zonder hashtags of extra tekst.', 'groq-ai-product-text' ),
+				'description' => __( 'Lijst met korte zoekwoorden zonder hashtags of extra tekst.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 				'maxItems'    => max( 1, $keyword_limit ),
 				'items'       => [
 					'type'      => 'string',
@@ -243,7 +308,7 @@ class Groq_AI_Prompt_Builder {
 		$schema = [
 			'type'                 => 'object',
 			'properties'           => $properties,
-			'required'             => [ 'title', 'short_description', 'description' ],
+			'required'             => [ 'title_suggestions', 'title', 'slug', 'short_description', 'description' ],
 			'additionalProperties' => false,
 		];
 
@@ -258,7 +323,9 @@ class Groq_AI_Prompt_Builder {
 
 	private function get_structured_response_instructions( $settings = null ) {
 		$schema_parts = [
+			'"title_suggestions":["...","...","..."]',
 			'"title":"..."',
+			'"slug":"..."',
 			'"short_description":"..."',
 			'"description":"..."',
 		];
@@ -274,7 +341,7 @@ class Groq_AI_Prompt_Builder {
 
 		$instruction = sprintf(
 			/* translators: %s: JSON structure example */
-			__( 'Geef ALLEEN een geldig JSON-object terug met deze structuur: %s. Gebruik dubbele aanhalingstekens, geen Markdown of extra tekst. Gebruik \\n voor regeleinden. Zorg dat zowel short_description als description nooit leeg zijn.', 'groq-ai-product-text' ),
+			__( 'Geef ALLEEN een geldig JSON-object terug met deze structuur: %s. Gebruik dubbele aanhalingstekens, geen Markdown of extra tekst. Gebruik \\n voor regeleinden. Zorg dat zowel short_description als description nooit leeg zijn.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			$json_structure
 		);
 
@@ -284,14 +351,16 @@ class Groq_AI_Prompt_Builder {
 			$desc_pixels   = $this->settings_manager->get_rankmath_meta_description_pixel_limit( $settings );
 			$instruction   .= ' ' . sprintf(
 				/* translators: 1: focus keyword limit, 2: meta title pixel limit, 3: meta description pixel limit */
-				__( 'Beperk meta_title tot maximaal 60 tekens en %2$d pixels en meta_description tot maximaal 160 tekens en %3$d pixels. Lever maximaal %1$d focuskeywords in het focus_keywords-array (korte termen zonder hashtag of extra tekst).', 'groq-ai-product-text' ),
+				__( 'Beperk meta_title tot maximaal 60 tekens en %2$d pixels en meta_description tot maximaal 160 tekens en %3$d pixels. Lever maximaal %1$d focuskeywords in het focus_keywords-array (korte termen zonder hashtag of extra tekst).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 				$keyword_limit,
 				$title_pixels,
 				$desc_pixels
 			);
 		}
 
-		$instruction .= ' ' . __( 'Zorg dat short_description en description geldige HTML bevatten (gebruik minimaal <p>-tags en waar relevant lijstjes of benadrukking). Voeg geen extra tekst buiten het JSON-object toe.', 'groq-ai-product-text' );
+		$instruction .= ' ' . __( 'Lever exact drie verschillende titelvoorstellen in title_suggestions en kopieer de beste keuze naar title.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+		$instruction .= ' ' . __( 'Zorg dat short_description en description geldige HTML bevatten (gebruik minimaal <p>-tags en waar relevant lijstjes of benadrukking). Voeg geen extra tekst buiten het JSON-object toe.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+		$instruction .= ' ' . __( 'Maak de slug URL-vriendelijk, gebruik alleen kleine letters, cijfers en koppeltekens en geen spaties.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
 
 		return $instruction;
 	}
@@ -358,8 +427,13 @@ class Groq_AI_Prompt_Builder {
 		return implode( '; ', $lines );
 	}
 
-	private function get_product_images_text( $post_id ) {
+	private function get_product_images_text( $post_id, $limit = 3 ) {
+		$limit     = max( 0, (int) $limit );
 		$image_ids = $this->get_product_image_ids( $post_id );
+
+		if ( $limit > 0 ) {
+			$image_ids = array_slice( $image_ids, 0, $limit );
+		}
 
 		if ( empty( $image_ids ) ) {
 			return '';
@@ -380,7 +454,13 @@ class Groq_AI_Prompt_Builder {
 	}
 
 	public function get_product_image_payloads( $post_id, $limit = 3, $max_filesize = 1572864 ) {
-		$image_ids = array_slice( $this->get_product_image_ids( $post_id ), 0, max( 1, (int) $limit ) );
+		$limit = max( 0, (int) $limit );
+
+		if ( $limit <= 0 ) {
+			return [];
+		}
+
+		$image_ids = array_slice( $this->get_product_image_ids( $post_id ), 0, $limit );
 
 		if ( empty( $image_ids ) ) {
 			return [];
@@ -476,7 +556,7 @@ class Groq_AI_Prompt_Builder {
 		$label = trim( wp_strip_all_tags( (string) $label ) );
 
 		if ( '' === $label ) {
-			$label = sprintf( __( 'Afbeelding %d', 'groq-ai-product-text' ), $position );
+			$label = sprintf( __( 'Afbeelding %d', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $position );
 		}
 
 		$path = get_attached_file( $attachment_id );

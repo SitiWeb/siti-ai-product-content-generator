@@ -30,13 +30,13 @@ class Groq_AI_Logs_Table extends WP_List_Table {
 
 	public function get_columns() {
 		return [
-			'created_at' => __( 'Datum', 'groq-ai-product-text' ),
-			'user_id'    => __( 'Gebruiker', 'groq-ai-product-text' ),
-			'post_title' => __( 'Product', 'groq-ai-product-text' ),
-			'provider'   => __( 'Provider', 'groq-ai-product-text' ),
-			'model'      => __( 'Model', 'groq-ai-product-text' ),
-			'status'     => __( 'Status', 'groq-ai-product-text' ),
-			'tokens_total' => __( 'Tokens', 'groq-ai-product-text' ),
+			'created_at' => __( 'Datum', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			'user_id'    => __( 'Gebruiker', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			'post_title' => __( 'Product', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			'provider'   => __( 'Provider', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			'model'      => __( 'Model', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			'status'     => __( 'Status', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			'tokens_total' => __( 'Tokens', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 		];
 	}
 
@@ -114,7 +114,7 @@ class Groq_AI_Logs_Table extends WP_List_Table {
 				if ( ! $item['post_id'] ) {
 					return '—';
 				}
-				$title = $item['post_title'] ? $item['post_title'] : sprintf( __( 'Product #%d', 'groq-ai-product-text' ), (int) $item['post_id'] );
+				$title = $item['post_title'] ? $item['post_title'] : sprintf( __( 'Product #%d', GROQ_AI_PRODUCT_TEXT_DOMAIN ), (int) $item['post_id'] );
 				$link  = get_edit_post_link( $item['post_id'] );
 				return $link ? sprintf( '<a href="%s">%s</a>', esc_url( $link ), esc_html( $title ) ) : esc_html( $title );
 			case 'user_id':
@@ -131,7 +131,7 @@ class Groq_AI_Logs_Table extends WP_List_Table {
 	}
 
 	public function no_items() {
-		esc_html_e( 'Nog geen AI-logboeken gevonden.', 'groq-ai-product-text' );
+		esc_html_e( 'Nog geen AI-logboeken gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
 	}
 
 	protected function column_created_at( $item ) {

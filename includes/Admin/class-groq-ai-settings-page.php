@@ -16,8 +16,8 @@ class Groq_AI_Product_Text_Settings_Page {
 
 	public function register_settings_pages() {
 		add_options_page(
-			__( 'Siti AI Productteksten', 'groq-ai-product-text' ),
-			__( 'Siti AI', 'groq-ai-product-text' ),
+			__( 'Siti AI Productteksten', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			__( 'Siti AI', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			'manage_options',
 			'groq-ai-product-text',
 			[ $this, 'render_settings_page' ]
@@ -25,8 +25,8 @@ class Groq_AI_Product_Text_Settings_Page {
 
 		add_submenu_page(
 			'options-general.php',
-			__( 'Siti AI Modules', 'groq-ai-product-text' ),
-			__( 'Siti AI Modules', 'groq-ai-product-text' ),
+			__( 'Siti AI Modules', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			__( 'Siti AI Modules', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			'manage_options',
 			'groq-ai-product-text-modules',
 			[ $this, 'render_modules_page' ]
@@ -34,8 +34,8 @@ class Groq_AI_Product_Text_Settings_Page {
 
 		add_submenu_page(
 			'options-general.php',
-			__( 'Siti AI AI-logboek', 'groq-ai-product-text' ),
-			__( 'Siti AI AI-logboek', 'groq-ai-product-text' ),
+			__( 'Siti AI AI-logboek', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			__( 'Siti AI AI-logboek', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			'manage_options',
 			'groq-ai-product-text-logs',
 			[ $this, 'render_logs_page' ]
@@ -43,8 +43,8 @@ class Groq_AI_Product_Text_Settings_Page {
 
 		add_submenu_page(
 			'options-general.php',
-			__( 'Siti AI Prompt instellingen', 'groq-ai-product-text' ),
-			__( 'Siti AI Prompt instellingen', 'groq-ai-product-text' ),
+			__( 'Siti AI Prompt instellingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			__( 'Siti AI Prompt instellingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			'manage_options',
 			'groq-ai-product-text-prompts',
 			[ $this, 'render_prompt_settings_page' ]
@@ -72,14 +72,14 @@ class Groq_AI_Product_Text_Settings_Page {
 
 		add_settings_section(
 			'groq_ai_product_text_general',
-			__( 'Algemene instellingen', 'groq-ai-product-text' ),
+			__( 'Algemene instellingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			'__return_false',
 			'groq-ai-product-text'
 		);
 
 		add_settings_field(
 			'groq_ai_provider',
-			__( 'AI-aanbieder', 'groq-ai-product-text' ),
+			__( 'AI-aanbieder', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			[ $this, 'render_provider_field' ],
 			'groq-ai-product-text',
 			'groq_ai_product_text_general'
@@ -87,7 +87,7 @@ class Groq_AI_Product_Text_Settings_Page {
 
 		add_settings_field(
 			'groq_ai_model',
-			__( 'Model', 'groq-ai-product-text' ),
+			__( 'Model', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			[ $this, 'render_model_field' ],
 			'groq-ai-product-text',
 			'groq_ai_product_text_general'
@@ -96,7 +96,7 @@ class Groq_AI_Product_Text_Settings_Page {
 		foreach ( $this->provider_manager->get_providers() as $provider ) {
 		add_settings_field(
 			'groq_ai_api_key_' . $provider->get_key(),
-			sprintf( __( '%s API-sleutel', 'groq-ai-product-text' ), $provider->get_label() ),
+			sprintf( __( '%s API-sleutel', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $provider->get_label() ),
 			[ $this, 'render_provider_api_key_field' ],
 			'groq-ai-product-text',
 			'groq_ai_product_text_general',
@@ -108,14 +108,14 @@ class Groq_AI_Product_Text_Settings_Page {
 
 		add_settings_section(
 			'groq_ai_product_text_prompts',
-			__( 'Prompt instellingen', 'groq-ai-product-text' ),
+			__( 'Prompt instellingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			'__return_false',
 			'groq-ai-product-text-prompts'
 		);
 
 		add_settings_field(
 			'groq_ai_store_context',
-			__( 'Winkelcontext', 'groq-ai-product-text' ),
+			__( 'Winkelcontext', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			[ $this, 'render_store_context_field' ],
 			'groq-ai-product-text-prompts',
 			'groq_ai_product_text_prompts'
@@ -123,7 +123,7 @@ class Groq_AI_Product_Text_Settings_Page {
 
 		add_settings_field(
 			'groq_ai_default_prompt',
-			__( 'Standaard prompt', 'groq-ai-product-text' ),
+			__( 'Standaard prompt', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			[ $this, 'render_default_prompt_field' ],
 			'groq-ai-product-text-prompts',
 			'groq_ai_product_text_prompts'
@@ -131,7 +131,7 @@ class Groq_AI_Product_Text_Settings_Page {
 
 		add_settings_field(
 			'groq_ai_context_fields',
-			__( 'Standaard productcontext', 'groq-ai-product-text' ),
+			__( 'Standaard productcontext', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			[ $this, 'render_context_fields_field' ],
 			'groq-ai-product-text-prompts',
 			'groq_ai_product_text_prompts'
@@ -139,7 +139,7 @@ class Groq_AI_Product_Text_Settings_Page {
 
 		add_settings_field(
 			'groq_ai_response_format_compat',
-			__( 'Response-format compatibiliteit', 'groq-ai-product-text' ),
+			__( 'Response-format compatibiliteit', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			[ $this, 'render_response_format_compat_field' ],
 			'groq-ai-product-text-prompts',
 			'groq_ai_product_text_prompts'
@@ -147,22 +147,30 @@ class Groq_AI_Product_Text_Settings_Page {
 
 		add_settings_field(
 			'groq_ai_image_context_mode',
-			__( 'Afbeeldingen toevoegen', 'groq-ai-product-text' ),
+			__( 'Afbeeldingen toevoegen', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			[ $this, 'render_image_context_mode_field' ],
+			'groq-ai-product-text-prompts',
+			'groq_ai_product_text_prompts'
+		);
+
+		add_settings_field(
+			'groq_ai_image_context_limit',
+			__( 'Maximaal aantal afbeeldingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			[ $this, 'render_image_context_limit_field' ],
 			'groq-ai-product-text-prompts',
 			'groq_ai_product_text_prompts'
 		);
 
 		add_settings_section(
 			'groq_ai_product_text_modules_rankmath',
-			__( 'Rank Math SEO', 'groq-ai-product-text' ),
+			__( 'Rank Math SEO', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			'__return_false',
 			'groq-ai-product-text-modules'
 		);
 
 		add_settings_field(
 			'groq_ai_module_rankmath',
-			__( 'Rank Math SEO', 'groq-ai-product-text' ),
+			__( 'Rank Math SEO', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			[ $this, 'render_rankmath_module_field' ],
 			'groq-ai-product-text-modules',
 			'groq_ai_product_text_modules_rankmath'
@@ -173,9 +181,9 @@ class Groq_AI_Product_Text_Settings_Page {
 		$settings = $this->plugin->get_settings();
 		$mode     = isset( $settings['image_context_mode'] ) ? $settings['image_context_mode'] : 'url';
 		$options  = [
-			'none'   => __( 'Nee, geen afbeeldingen', 'groq-ai-product-text' ),
-			'url'    => __( 'Ja, voeg afbeeldings-URL’s toe aan de prompt', 'groq-ai-product-text' ),
-			'base64' => __( 'Ja, verstuur afbeeldingen als Base64 (indien ondersteund)', 'groq-ai-product-text' ),
+			'none'   => __( 'Nee, geen afbeeldingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			'url'    => __( 'Ja, voeg afbeeldings-URL’s toe aan de prompt', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			'base64' => __( 'Ja, verstuur afbeeldingen als Base64 (indien ondersteund)', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 		];
 		?>
 		<select name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[image_context_mode]">
@@ -184,7 +192,24 @@ class Groq_AI_Product_Text_Settings_Page {
 			<?php endforeach; ?>
 		</select>
 		<p class="description">
-			<?php esc_html_e( 'Bepaal hoe productafbeeldingen worden meegestuurd: helemaal niet, als URL’s in de prompt of als Base64-bijlagen voor modellen die beeldcontext ondersteunen.', 'groq-ai-product-text' ); ?>
+			<?php esc_html_e( 'Bepaal hoe productafbeeldingen worden meegestuurd: helemaal niet, als URL’s in de prompt of als Base64-bijlagen voor modellen die beeldcontext ondersteunen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+		</p>
+		<?php
+	}
+
+	public function render_image_context_limit_field() {
+		$settings = $this->plugin->get_settings();
+		$limit    = $this->plugin->get_image_context_limit( $settings );
+		?>
+		<input type="number"
+			name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[image_context_limit]"
+			min="1"
+			max="10"
+			step="1"
+			value="<?php echo esc_attr( $limit ); ?>"
+			class="small-text" />
+		<p class="description">
+			<?php esc_html_e( 'Stel hier het maximum aantal productafbeeldingen in dat wordt meegestuurd (we beginnen bij de uitgelichte afbeelding, gevolgd door de galerij).', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 		</p>
 		<?php
 	}
@@ -197,19 +222,19 @@ class Groq_AI_Product_Text_Settings_Page {
 		$settings = $this->plugin->get_settings();
 		?>
 		<div class="wrap">
-			<h1><?php esc_html_e( 'Siti AI Productteksten', 'groq-ai-product-text' ); ?></h1>
+			<h1><?php esc_html_e( 'Siti AI Productteksten', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
 			<p style="margin-bottom:16px;">
 				<a href="<?php echo esc_url( admin_url( 'admin.php?page=groq-ai-product-text-prompts' ) ); ?>" class="button button-primary">
-					<?php esc_html_e( 'Prompt instellingen', 'groq-ai-product-text' ); ?>
+					<?php esc_html_e( 'Prompt instellingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 				</a>
 				<a href="<?php echo esc_url( admin_url( 'admin.php?page=groq-ai-product-text-modules' ) ); ?>" class="button button-secondary">
-					<?php esc_html_e( 'Ga naar modules', 'groq-ai-product-text' ); ?>
+					<?php esc_html_e( 'Ga naar modules', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 				</a>
 				<a href="<?php echo esc_url( admin_url( 'admin.php?page=groq-ai-product-text-logs' ) ); ?>" class="button">
-					<?php esc_html_e( 'Bekijk AI-logboek', 'groq-ai-product-text' ); ?>
+					<?php esc_html_e( 'Bekijk AI-logboek', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 				</a>
 			</p>
-			<p><?php esc_html_e( 'Kies je AI-aanbieder, stel de juiste API-sleutel en het gewenste model in.', 'groq-ai-product-text' ); ?></p>
+			<p><?php esc_html_e( 'Kies je AI-aanbieder, stel de juiste API-sleutel en het gewenste model in.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
 			<form action="options.php" method="post">
 				<?php
 				settings_fields( 'groq_ai_product_text_group' );
@@ -228,8 +253,8 @@ class Groq_AI_Product_Text_Settings_Page {
 
 		?>
 		<div class="wrap">
-			<h1><?php esc_html_e( 'Siti AI Modules', 'groq-ai-product-text' ); ?></h1>
-			<p><?php esc_html_e( 'Beheer aparte integraties zoals Rank Math. Het uitschakelen van een module verwijdert de bijbehorende AI-uitvoer automatisch uit de productmodal.', 'groq-ai-product-text' ); ?></p>
+			<h1><?php esc_html_e( 'Siti AI Modules', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
+			<p><?php esc_html_e( 'Beheer aparte integraties zoals Rank Math. Het uitschakelen van een module verwijdert de bijbehorende AI-uitvoer automatisch uit de productmodal.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
 			<form action="options.php" method="post">
 				<?php
 				settings_fields( 'groq_ai_product_text_group' );
@@ -249,13 +274,13 @@ class Groq_AI_Product_Text_Settings_Page {
 		$settings = $this->plugin->get_settings();
 		?>
 		<div class="wrap">
-			<h1><?php esc_html_e( 'Prompt instellingen', 'groq-ai-product-text' ); ?></h1>
+			<h1><?php esc_html_e( 'Prompt instellingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
 			<p style="margin-bottom:16px;">
 				<a href="<?php echo esc_url( admin_url( 'options-general.php?page=groq-ai-product-text' ) ); ?>" class="button button-secondary">
-					<?php esc_html_e( 'Terug naar algemene instellingen', 'groq-ai-product-text' ); ?>
+					<?php esc_html_e( 'Terug naar algemene instellingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 				</a>
 			</p>
-			<p><?php esc_html_e( 'Beheer hier de winkelcontext, standaardprompt, productcontext en response-format instellingen. Deze keuzes bepalen hoe elke prompt richting de AI wordt opgebouwd.', 'groq-ai-product-text' ); ?></p>
+			<p><?php esc_html_e( 'Beheer hier de winkelcontext, standaardprompt, productcontext en response-format instellingen. Deze keuzes bepalen hoe elke prompt richting de AI wordt opgebouwd.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
 			<form action="options.php" method="post">
 				<?php
 				settings_fields( 'groq_ai_product_text_group' );
@@ -264,8 +289,8 @@ class Groq_AI_Product_Text_Settings_Page {
 				?>
 			</form>
 			<div class="groq-ai-prompt-helper">
-				<h2><?php esc_html_e( 'Prompt generator', 'groq-ai-product-text' ); ?></h2>
-				<p><?php esc_html_e( 'Gebruik deze velden om belangrijke informatie voor de AI bij te houden (bijvoorbeeld tone of voice, USP’s of doelgroepen). Voeg ze toe aan je prompt met kopiëren en plakken.', 'groq-ai-product-text' ); ?></p>
+				<h2><?php esc_html_e( 'Prompt generator', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
+				<p><?php esc_html_e( 'Gebruik deze velden om belangrijke informatie voor de AI bij te houden (bijvoorbeeld tone of voice, USP’s of doelgroepen). Voeg ze toe aan je prompt met kopiëren en plakken.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
 				<textarea class="large-text" rows="6" readonly><?php echo esc_textarea( $this->plugin->build_prompt_template_preview( $settings ) ); ?></textarea>
 			</div>
 		</div>
@@ -281,54 +306,54 @@ class Groq_AI_Product_Text_Settings_Page {
 		$logs_table->prepare_items();
 		?>
 		<div class="wrap">
-			<h1><?php esc_html_e( 'AI-logboek', 'groq-ai-product-text' ); ?></h1>
-			<p><?php esc_html_e( 'Bekijk recente AI-generaties inclusief status, gebruiker en tokens.', 'groq-ai-product-text' ); ?></p>
+			<h1><?php esc_html_e( 'AI-logboek', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
+			<p><?php esc_html_e( 'Bekijk recente AI-generaties inclusief status, gebruiker en tokens.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
 			<form method="get">
 				<input type="hidden" name="page" value="groq-ai-product-text-logs" />
-				<?php $logs_table->search_box( __( 'Zoek logs', 'groq-ai-product-text' ), 'groq-ai-logs' ); ?>
+				<?php $logs_table->search_box( __( 'Zoek logs', GROQ_AI_PRODUCT_TEXT_DOMAIN ), 'groq-ai-logs' ); ?>
 				<?php $logs_table->display(); ?>
 			</form>
 		</div>
 		<div id="groq-ai-log-modal" class="groq-ai-log-modal" aria-hidden="true">
 			<div class="groq-ai-log-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="groq-ai-log-modal-title">
-				<button type="button" class="groq-ai-log-modal__close" aria-label="<?php esc_attr_e( 'Sluiten', 'groq-ai-product-text' ); ?>">&times;</button>
+				<button type="button" class="groq-ai-log-modal__close" aria-label="<?php esc_attr_e( 'Sluiten', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>">&times;</button>
 				<div class="groq-ai-log-modal__content">
-					<h2 id="groq-ai-log-modal-title"><?php esc_html_e( 'Logdetails', 'groq-ai-product-text' ); ?></h2>
+					<h2 id="groq-ai-log-modal-title"><?php esc_html_e( 'Logdetails', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
 					<p class="description groq-ai-log-meta"></p>
 					<div class="groq-ai-log-fields">
 						<label>
-							<span><?php esc_html_e( 'Prompt', 'groq-ai-product-text' ); ?></span>
+							<span><?php esc_html_e( 'Prompt', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></span>
 							<textarea id="groq-ai-log-prompt" readonly rows="6"></textarea>
 						</label>
 						<label>
-							<span><?php esc_html_e( 'Response', 'groq-ai-product-text' ); ?></span>
+							<span><?php esc_html_e( 'Response', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></span>
 							<textarea id="groq-ai-log-response" readonly rows="6"></textarea>
 						</label>
 						<div class="groq-ai-log-tokens">
 							<div>
-								<strong><?php esc_html_e( 'Tokens prompt', 'groq-ai-product-text' ); ?></strong>
+								<strong><?php esc_html_e( 'Tokens prompt', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
 								<span id="groq-ai-log-tokens-prompt">—</span>
 							</div>
 							<div>
-								<strong><?php esc_html_e( 'Tokens response', 'groq-ai-product-text' ); ?></strong>
+								<strong><?php esc_html_e( 'Tokens response', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
 								<span id="groq-ai-log-tokens-completion">—</span>
 							</div>
 							<div>
-								<strong><?php esc_html_e( 'Tokens totaal', 'groq-ai-product-text' ); ?></strong>
+								<strong><?php esc_html_e( 'Tokens totaal', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
 								<span id="groq-ai-log-tokens-total">—</span>
 							</div>
 						</div>
 						<div class="groq-ai-log-images">
 							<div>
-								<strong><?php esc_html_e( 'Afbeeldingsmodus', 'groq-ai-product-text' ); ?></strong>
+								<strong><?php esc_html_e( 'Afbeeldingsmodus', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
 								<span id="groq-ai-log-images-mode">—</span>
 							</div>
 							<div>
-								<strong><?php esc_html_e( 'Beschikbare afbeeldingen', 'groq-ai-product-text' ); ?></strong>
+								<strong><?php esc_html_e( 'Beschikbare afbeeldingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
 								<span id="groq-ai-log-images-available">—</span>
 							</div>
 							<div>
-								<strong><?php esc_html_e( 'Base64 meegestuurd', 'groq-ai-product-text' ); ?></strong>
+								<strong><?php esc_html_e( 'Base64 meegestuurd', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
 								<span id="groq-ai-log-images-base64">—</span>
 							</div>
 						</div>
@@ -436,7 +461,7 @@ class Groq_AI_Product_Text_Settings_Page {
 				</option>
 			<?php endforeach; ?>
 		</select>
-		<p class="description"><?php esc_html_e( 'Bepaal welke AI-dienst wordt aangesproken wanneer je teksten genereert.', 'groq-ai-product-text' ); ?></p>
+		<p class="description"><?php esc_html_e( 'Bepaal welke AI-dienst wordt aangesproken wanneer je teksten genereert.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
 		<?php
 	}
 
@@ -452,11 +477,11 @@ class Groq_AI_Product_Text_Settings_Page {
 				name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[model]"
 				data-current-model="<?php echo esc_attr( $current_model ); ?>"
 			>
-				<option value=""><?php esc_html_e( 'Selecteer een model via "Live modellen ophalen"', 'groq-ai-product-text' ); ?></option>
+				<option value=""><?php esc_html_e( 'Selecteer een model via "Live modellen ophalen"', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></option>
 			</select>
-			<p class="description"><?php esc_html_e( 'Gebruik de knop hieronder om rechtstreeks via het API-endpoint beschikbare modellen op te halen. Zonder een live lijst blijft de selectie leeg.', 'groq-ai-product-text' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Gebruik de knop hieronder om rechtstreeks via het API-endpoint beschikbare modellen op te halen. Zonder een live lijst blijft de selectie leeg.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
 			<button type="button" class="button" id="groq-ai-refresh-models" style="margin-top:10px;">
-				<?php esc_html_e( 'Live modellen ophalen', 'groq-ai-product-text' ); ?>
+				<?php esc_html_e( 'Live modellen ophalen', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 			</button>
 			<p id="groq-ai-refresh-models-status" class="description" aria-live="polite"></p>
 		</div>
@@ -476,7 +501,7 @@ class Groq_AI_Product_Text_Settings_Page {
 				<?php
 				printf(
 					/* translators: %s: provider name */
-					esc_html__( 'Voeg hier de API-sleutel voor %s toe.', 'groq-ai-product-text' ),
+					esc_html__( 'Voeg hier de API-sleutel voor %s toe.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 					esc_html( $provider->get_label() )
 				);
 				?>
@@ -489,15 +514,15 @@ class Groq_AI_Product_Text_Settings_Page {
 		$settings = $this->plugin->get_settings();
 		?>
 		<textarea name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[store_context]" class="large-text" rows="4"><?php echo esc_textarea( $settings['store_context'] ); ?></textarea>
-		<p class="description"><?php esc_html_e( 'Beschrijf het merk, de tone of voice en andere relevante winkelinformatie.', 'groq-ai-product-text' ); ?></p>
+		<p class="description"><?php esc_html_e( 'Beschrijf het merk, de tone of voice en andere relevante winkelinformatie.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
 		<?php
 	}
 
 	public function render_default_prompt_field() {
 		$settings = $this->plugin->get_settings();
 		?>
-		<textarea name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[default_prompt]" class="large-text" rows="4" placeholder="<?php esc_attr_e( 'Bijvoorbeeld: Schrijf een overtuigende productbeschrijving met nadruk op kwaliteit en levertijd.', 'groq-ai-product-text' ); ?>"><?php echo esc_textarea( $settings['default_prompt'] ); ?></textarea>
-		<p class="description"><?php esc_html_e( 'Deze tekst verschijnt vooraf ingevuld in de AI-popup, maar kan per product worden aangepast.', 'groq-ai-product-text' ); ?></p>
+		<textarea name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[default_prompt]" class="large-text" rows="4" placeholder="<?php esc_attr_e( 'Bijvoorbeeld: Schrijf een overtuigende productbeschrijving met nadruk op kwaliteit en levertijd.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>"><?php echo esc_textarea( $settings['default_prompt'] ); ?></textarea>
+		<p class="description"><?php esc_html_e( 'Deze tekst verschijnt vooraf ingevuld in de AI-popup, maar kan per product worden aangepast.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
 		<?php
 	}
 
@@ -530,10 +555,10 @@ class Groq_AI_Product_Text_Settings_Page {
 		?>
 		<label>
 			<input type="checkbox" name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[response_format_compat]" value="1" <?php checked( $is_enabled ); ?> />
-			<?php esc_html_e( 'Compatibele modus inschakelen (instructies toevoegen aan de prompt).', 'groq-ai-product-text' ); ?>
+			<?php esc_html_e( 'Compatibele modus inschakelen (instructies toevoegen aan de prompt).', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 		</label>
 		<p class="description">
-			<?php esc_html_e( 'Standaard gebruikt de plugin de response_format-functie van aanbieders zoals Groq en OpenAI voor gegarandeerde JSON-uitvoer. Schakel deze optie alleen in wanneer je problemen ervaart met oudere modellen of eigen integraties die deze functie niet ondersteunen.', 'groq-ai-product-text' ); ?>
+			<?php esc_html_e( 'Standaard gebruikt de plugin de response_format-functie van aanbieders zoals Groq en OpenAI voor gegarandeerde JSON-uitvoer. Schakel deze optie alleen in wanneer je problemen ervaart met oudere modellen of eigen integraties die deze functie niet ondersteunen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 		</p>
 		<?php
 	}
@@ -557,19 +582,19 @@ class Groq_AI_Product_Text_Settings_Page {
 			<input type="hidden" name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[modules][rankmath][enabled]" value="0" />
 			<label>
 				<input type="checkbox" name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[modules][rankmath][enabled]" value="1" <?php checked( $enabled ); ?> <?php disabled( ! $rankmath_active ); ?> />
-				<?php esc_html_e( 'Activeer Rank Math integratie (meta title, meta description en focus keywords genereren).', 'groq-ai-product-text' ); ?>
+				<?php esc_html_e( 'Activeer Rank Math integratie (meta title, meta description en focus keywords genereren).', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 			</label>
 			<p class="description" style="margin-top:4px;">
 				<?php
 				if ( ! $rankmath_active ) {
-					esc_html_e( 'Installeer en activeer Rank Math om deze opties te gebruiken. Velden zijn momenteel alleen-lezen.', 'groq-ai-product-text' );
+					esc_html_e( 'Installeer en activeer Rank Math om deze opties te gebruiken. Velden zijn momenteel alleen-lezen.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
 				} else {
-					esc_html_e( 'Wanneer ingeschakeld worden extra velden in de AI-modal getoond en automatisch gekoppeld aan Rank Math.', 'groq-ai-product-text' );
+					esc_html_e( 'Wanneer ingeschakeld worden extra velden in de AI-modal getoond en automatisch gekoppeld aan Rank Math.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
 				}
 				?>
 			</p>
 			<label for="groq-ai-rankmath-keywords">
-				<?php esc_html_e( 'Aantal focus keywords om te genereren', 'groq-ai-product-text' ); ?>
+				<?php esc_html_e( 'Aantal focus keywords om te genereren', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 			</label>
 			<input
 				type="number"
@@ -582,10 +607,10 @@ class Groq_AI_Product_Text_Settings_Page {
 				<?php disabled( ! $rankmath_active ); ?>
 			/>
 			<p class="description">
-				<?php esc_html_e( 'Bepaal hoeveel zoekwoorden de AI maximaal mag teruggeven (bijvoorbeeld 3).', 'groq-ai-product-text' ); ?>
+				<?php esc_html_e( 'Bepaal hoeveel zoekwoorden de AI maximaal mag teruggeven (bijvoorbeeld 3).', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 			</p>
 			<label for="groq-ai-rankmath-title-pixels">
-				<?php esc_html_e( 'Maximale meta title breedte (pixels)', 'groq-ai-product-text' ); ?>
+				<?php esc_html_e( 'Maximale meta title breedte (pixels)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 			</label>
 			<input
 				type="number"
@@ -599,10 +624,10 @@ class Groq_AI_Product_Text_Settings_Page {
 				<?php disabled( ! $rankmath_active ); ?>
 			/>
 			<p class="description">
-				<?php esc_html_e( 'Bepaal hoe breed (in pixels) de meta title maximaal mag zijn volgens de SERP-richtlijnen.', 'groq-ai-product-text' ); ?>
+				<?php esc_html_e( 'Bepaal hoe breed (in pixels) de meta title maximaal mag zijn volgens de SERP-richtlijnen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 			</p>
 			<label for="groq-ai-rankmath-pixels">
-				<?php esc_html_e( 'Maximale meta description breedte (pixels)', 'groq-ai-product-text' ); ?>
+				<?php esc_html_e( 'Maximale meta description breedte (pixels)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 			</label>
 			<input
 				type="number"
@@ -616,7 +641,7 @@ class Groq_AI_Product_Text_Settings_Page {
 				<?php disabled( ! $rankmath_active ); ?>
 			/>
 			<p class="description">
-				<?php esc_html_e( 'Gebruik het SERP-voorbeeld als referentie. De AI krijgt door dat de meta description deze pixelbreedte niet mag overschrijden.', 'groq-ai-product-text' ); ?>
+				<?php esc_html_e( 'Gebruik het SERP-voorbeeld als referentie. De AI krijgt door dat de meta description deze pixelbreedte niet mag overschrijden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 			</p>
 		</div>
 		<?php
@@ -660,7 +685,7 @@ class Groq_AI_Product_Text_Settings_Page {
 			'refreshNonce'    => wp_create_nonce( 'groq_ai_refresh_models' ),
 			'excludedModels'  => Groq_AI_Model_Exclusions::get_all(),
 			'placeholders'    => [
-				'selectModel' => __( 'Selecteer een model via "Live modellen ophalen"', 'groq-ai-product-text' ),
+				'selectModel' => __( 'Selecteer een model via "Live modellen ophalen"', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			],
 		];
 
@@ -669,7 +694,7 @@ class Groq_AI_Product_Text_Settings_Page {
 			$cached_models  = $this->plugin->get_cached_models_for_provider( $provider_key );
 			$cached_models  = Groq_AI_Model_Exclusions::filter_models( $provider_key, $cached_models );
 			$data['providers'][ $provider->get_key() ] = [
-				'default_label' => sprintf( __( 'Gebruik standaardmodel (%s)', 'groq-ai-product-text' ), $provider->get_default_model() ),
+				'default_label' => sprintf( __( 'Gebruik standaardmodel (%s)', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $provider->get_default_model() ),
 				'models'        => $cached_models,
 				'supports_live' => $provider->supports_live_models(),
 			];

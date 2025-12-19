@@ -14,7 +14,7 @@ class Groq_AI_Product_Text_Product_UI {
 	public function register_meta_box() {
 		add_meta_box(
 			'groq-ai-generator-box',
-			__( 'Gebruik AI', 'groq-ai-product-text' ),
+			__( 'Gebruik AI', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			[ $this, 'render_meta_box' ],
 			'product',
 			'side',
@@ -24,14 +24,14 @@ class Groq_AI_Product_Text_Product_UI {
 
 	public function render_meta_box() {
 		if ( ! current_user_can( 'edit_products' ) ) {
-			echo '<p>' . esc_html__( 'Je hebt geen toestemming om deze actie uit te voeren.', 'groq-ai-product-text' ) . '</p>';
+			echo '<p>' . esc_html__( 'Je hebt geen toestemming om deze actie uit te voeren.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) . '</p>';
 			return;
 		}
 		?>
-		<p><?php esc_html_e( 'Laat de geselecteerde AI een concepttekst genereren op basis van een prompt.', 'groq-ai-product-text' ); ?></p>
-		<button type="button" class="button button-primary groq-ai-open-modal" data-target="groq-ai-modal"><?php esc_html_e( 'Gebruik AI', 'groq-ai-product-text' ); ?></button>
+		<p><?php esc_html_e( 'Laat de geselecteerde AI een concepttekst genereren op basis van een prompt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+		<button type="button" class="button button-primary groq-ai-open-modal" data-target="groq-ai-modal"><?php esc_html_e( 'Gebruik AI', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
 		<p class="description" style="margin-top:8px;">
-			<?php esc_html_e( 'Klik om een prompt in te voeren en een voorsteltekst te genereren. Plak het resultaat in de beschrijving of korte beschrijving.', 'groq-ai-product-text' ); ?>
+			<?php esc_html_e( 'Klik om een prompt in te voeren en een voorsteltekst te genereren. Plak het resultaat in de beschrijving of korte beschrijving.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 		</p>
 		<?php
 	}
@@ -85,25 +85,25 @@ class Groq_AI_Product_Text_Product_UI {
 		?>
 		<div id="groq-ai-modal" class="groq-ai-modal" aria-hidden="true">
 			<div class="groq-ai-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="groq-ai-modal-title">
-				<button type="button" class="groq-ai-modal__close" aria-label="<?php esc_attr_e( 'Sluiten', 'groq-ai-product-text' ); ?>">&times;</button>
+				<button type="button" class="groq-ai-modal__close" aria-label="<?php esc_attr_e( 'Sluiten', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>">&times;</button>
 				<div class="groq-ai-modal__dialog-inner">
-					<h2 id="groq-ai-modal-title"><?php esc_html_e( 'Siti AI prompt', 'groq-ai-product-text' ); ?></h2>
+					<h2 id="groq-ai-modal-title"><?php esc_html_e( 'Siti AI prompt', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
 					<form id="groq-ai-form">
-						<label for="groq-ai-prompt" class="screen-reader-text"><?php esc_html_e( 'Prompt', 'groq-ai-product-text' ); ?></label>
-						<textarea id="groq-ai-prompt" rows="6" placeholder="<?php esc_attr_e( 'Beschrijf hier wat de AI moet schrijven...', 'groq-ai-product-text' ); ?>"></textarea>
+						<label for="groq-ai-prompt" class="screen-reader-text"><?php esc_html_e( 'Prompt', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label>
+						<textarea id="groq-ai-prompt" rows="6" placeholder="<?php esc_attr_e( 'Beschrijf hier wat de AI moet schrijven...', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>"></textarea>
 					<div class="groq-ai-modal__actions">
 						<button type="submit" class="button button-primary">
-							<?php esc_html_e( 'Genereer tekst', 'groq-ai-product-text' ); ?>
+							<?php esc_html_e( 'Genereer tekst', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 						</button>
 					</div>
 					<div class="groq-ai-advanced-settings">
 						<button type="button" class="groq-ai-advanced-toggle" aria-expanded="false" aria-controls="groq-ai-advanced-panel">
 							<span class="groq-ai-advanced-toggle__icon" aria-hidden="true"></span>
-							<?php esc_html_e( 'Geavanceerde instellingen', 'groq-ai-product-text' ); ?>
+							<?php esc_html_e( 'Geavanceerde instellingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 						</button>
 						<div id="groq-ai-advanced-panel" class="groq-ai-context-options" hidden>
-							<h3><?php esc_html_e( 'Gebruik deze productinformatie in de prompt', 'groq-ai-product-text' ); ?></h3>
-							<p class="description"><?php esc_html_e( 'Je kunt tijdelijk onderdelen uitzetten of weer inschakelen. Standaard zijn de opties aangevinkt zoals ingesteld op de instellingenpagina.', 'groq-ai-product-text' ); ?></p>
+							<h3><?php esc_html_e( 'Gebruik deze productinformatie in de prompt', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h3>
+							<p class="description"><?php esc_html_e( 'Je kunt tijdelijk onderdelen uitzetten of weer inschakelen. Standaard zijn de opties aangevinkt zoals ingesteld op de instellingenpagina.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
 							<div class="groq-ai-context-options__grid">
 								<?php
 								$context_definitions = $this->plugin->get_context_field_definitions();
@@ -126,81 +126,97 @@ class Groq_AI_Product_Text_Product_UI {
 					</div>
 					</form>
 					<div class="groq-ai-modal__result" hidden>
-						<h3><?php esc_html_e( 'Resultaat', 'groq-ai-product-text' ); ?></h3>
-					<div class="groq-ai-result-grid">
-						<div class="groq-ai-result-field" data-field="title" data-target-input="#title" data-label="<?php esc_attr_e( 'Producttitel', 'groq-ai-product-text' ); ?>">
+						<h3><?php esc_html_e( 'Resultaat', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h3>
+						<div class="groq-ai-result-grid">
+							<div class="groq-ai-result-field" data-field="title" data-target-input="#title" data-label="<?php esc_attr_e( 'Producttitel', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>">
+								<div class="groq-ai-result-field__header">
+									<strong><?php esc_html_e( 'Producttitel', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
+									<div class="groq-ai-result-field__actions">
+									<button type="button" class="button button-secondary groq-ai-copy-field" data-field="title"><?php esc_html_e( 'Kopieer', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
+										<button type="button" class="button groq-ai-apply-field" data-field="title"><?php esc_html_e( 'Vul titel in', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
+										<span class="groq-ai-apply-status" aria-hidden="true"></span>
+									</div>
+								</div>
+								<div class="groq-ai-title-suggestions" data-title-suggestions hidden>
+									<p class="groq-ai-title-suggestions__label"><?php esc_html_e( 'Kies je favoriete titelvoorstel:', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+									<div class="groq-ai-title-suggestions__options" data-title-suggestions-options></div>
+									<p class="description groq-ai-title-suggestions__hint"><?php esc_html_e( 'Je kunt de tekst hieronder altijd nog aanpassen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+								</div>
+								<textarea rows="2"></textarea>
+							</div>
+						<div class="groq-ai-result-field" data-field="slug" data-target-input="#slug" data-label="<?php esc_attr_e( 'Productslug', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>">
 							<div class="groq-ai-result-field__header">
-								<strong><?php esc_html_e( 'Producttitel', 'groq-ai-product-text' ); ?></strong>
+								<strong><?php esc_html_e( 'Productslug', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
 								<div class="groq-ai-result-field__actions">
-									<button type="button" class="button button-secondary groq-ai-copy-field" data-field="title"><?php esc_html_e( 'Kopieer', 'groq-ai-product-text' ); ?></button>
-									<button type="button" class="button groq-ai-apply-field" data-field="title"><?php esc_html_e( 'Vul titel in', 'groq-ai-product-text' ); ?></button>
+									<button type="button" class="button button-secondary groq-ai-copy-field" data-field="slug"><?php esc_html_e( 'Kopieer', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
+									<button type="button" class="button groq-ai-apply-field" data-field="slug"><?php esc_html_e( 'Vul slug in', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
 									<span class="groq-ai-apply-status" aria-hidden="true"></span>
 								</div>
 							</div>
-							<textarea rows="2"></textarea>
+							<textarea rows="1"></textarea>
 						</div>
-						<div class="groq-ai-result-field" data-field="short_description" data-target-input="#excerpt" data-label="<?php esc_attr_e( 'Korte beschrijving', 'groq-ai-product-text' ); ?>">
+						<div class="groq-ai-result-field" data-field="short_description" data-target-input="#excerpt" data-label="<?php esc_attr_e( 'Korte beschrijving', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>">
 							<div class="groq-ai-result-field__header">
-								<strong><?php esc_html_e( 'Korte beschrijving', 'groq-ai-product-text' ); ?></strong>
+								<strong><?php esc_html_e( 'Korte beschrijving', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
 								<div class="groq-ai-result-field__actions">
-									<button type="button" class="button button-secondary groq-ai-copy-field" data-field="short_description"><?php esc_html_e( 'Kopieer', 'groq-ai-product-text' ); ?></button>
-									<button type="button" class="button groq-ai-apply-field" data-field="short_description"><?php esc_html_e( 'Vul korte beschrijving in', 'groq-ai-product-text' ); ?></button>
+									<button type="button" class="button button-secondary groq-ai-copy-field" data-field="short_description"><?php esc_html_e( 'Kopieer', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
+									<button type="button" class="button groq-ai-apply-field" data-field="short_description"><?php esc_html_e( 'Vul korte beschrijving in', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
 									<span class="groq-ai-apply-status" aria-hidden="true"></span>
 								</div>
 							</div>
 							<textarea rows="3"></textarea>
 						</div>
-						<div class="groq-ai-result-field" data-field="description" data-target-input="#content" data-label="<?php esc_attr_e( 'Beschrijving', 'groq-ai-product-text' ); ?>">
+						<div class="groq-ai-result-field" data-field="description" data-target-input="#content" data-label="<?php esc_attr_e( 'Beschrijving', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>">
 							<div class="groq-ai-result-field__header">
-								<strong><?php esc_html_e( 'Beschrijving', 'groq-ai-product-text' ); ?></strong>
+								<strong><?php esc_html_e( 'Beschrijving', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
 								<div class="groq-ai-result-field__actions">
-									<button type="button" class="button button-secondary groq-ai-copy-field" data-field="description"><?php esc_html_e( 'Kopieer', 'groq-ai-product-text' ); ?></button>
-									<button type="button" class="button groq-ai-apply-field" data-field="description"><?php esc_html_e( 'Vul beschrijving in', 'groq-ai-product-text' ); ?></button>
+									<button type="button" class="button button-secondary groq-ai-copy-field" data-field="description"><?php esc_html_e( 'Kopieer', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
+									<button type="button" class="button groq-ai-apply-field" data-field="description"><?php esc_html_e( 'Vul beschrijving in', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
 									<span class="groq-ai-apply-status" aria-hidden="true"></span>
 								</div>
 							</div>
 							<textarea rows="6"></textarea>
 						</div>
 						<?php if ( $rankmath_enabled ) : ?>
-							<div class="groq-ai-result-field" data-field="meta_title" data-target-input="#rank_math_title" data-rankmath-action="updateTitle" data-label="<?php esc_attr_e( 'Rank Math meta titel', 'groq-ai-product-text' ); ?>">
+							<div class="groq-ai-result-field" data-field="meta_title" data-target-input="#rank_math_title" data-rankmath-action="updateTitle" data-label="<?php esc_attr_e( 'Rank Math meta titel', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>">
 								<div class="groq-ai-result-field__header">
-									<strong><?php esc_html_e( 'Rank Math meta titel', 'groq-ai-product-text' ); ?></strong>
+									<strong><?php esc_html_e( 'Rank Math meta titel', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
 									<div class="groq-ai-result-field__actions">
-										<button type="button" class="button button-secondary groq-ai-copy-field" data-field="meta_title"><?php esc_html_e( 'Kopieer', 'groq-ai-product-text' ); ?></button>
-										<button type="button" class="button groq-ai-apply-field" data-field="meta_title"><?php esc_html_e( 'Vul meta titel in', 'groq-ai-product-text' ); ?></button>
+										<button type="button" class="button button-secondary groq-ai-copy-field" data-field="meta_title"><?php esc_html_e( 'Kopieer', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
+										<button type="button" class="button groq-ai-apply-field" data-field="meta_title"><?php esc_html_e( 'Vul meta titel in', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
 										<span class="groq-ai-apply-status" aria-hidden="true"></span>
 									</div>
 								</div>
 								<textarea rows="2"></textarea>
 							</div>
-							<div class="groq-ai-result-field" data-field="meta_description" data-target-input="#rank_math_description" data-rankmath-action="updateDescription" data-label="<?php esc_attr_e( 'Rank Math meta description', 'groq-ai-product-text' ); ?>">
+							<div class="groq-ai-result-field" data-field="meta_description" data-target-input="#rank_math_description" data-rankmath-action="updateDescription" data-label="<?php esc_attr_e( 'Rank Math meta description', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>">
 								<div class="groq-ai-result-field__header">
-									<strong><?php esc_html_e( 'Rank Math meta description', 'groq-ai-product-text' ); ?></strong>
+									<strong><?php esc_html_e( 'Rank Math meta description', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
 									<div class="groq-ai-result-field__actions">
-										<button type="button" class="button button-secondary groq-ai-copy-field" data-field="meta_description"><?php esc_html_e( 'Kopieer', 'groq-ai-product-text' ); ?></button>
-										<button type="button" class="button groq-ai-apply-field" data-field="meta_description"><?php esc_html_e( 'Vul meta description in', 'groq-ai-product-text' ); ?></button>
+										<button type="button" class="button button-secondary groq-ai-copy-field" data-field="meta_description"><?php esc_html_e( 'Kopieer', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
+										<button type="button" class="button groq-ai-apply-field" data-field="meta_description"><?php esc_html_e( 'Vul meta description in', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
 										<span class="groq-ai-apply-status" aria-hidden="true"></span>
 									</div>
 								</div>
 								<textarea rows="3"></textarea>
 							</div>
-							<div class="groq-ai-result-field" data-field="focus_keywords" data-target-input="#rank_math_focus_keyword" data-rankmath-action="updateKeywords" data-label="<?php esc_attr_e( 'Rank Math focus keyphrase', 'groq-ai-product-text' ); ?>">
+							<div class="groq-ai-result-field" data-field="focus_keywords" data-target-input="#rank_math_focus_keyword" data-rankmath-action="updateKeywords" data-label="<?php esc_attr_e( 'Rank Math focus keyphrase', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>">
 								<div class="groq-ai-result-field__header">
-									<strong><?php esc_html_e( 'Rank Math focus keyphrase', 'groq-ai-product-text' ); ?></strong>
+									<strong><?php esc_html_e( 'Rank Math focus keyphrase', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
 									<div class="groq-ai-result-field__actions">
-										<button type="button" class="button button-secondary groq-ai-copy-field" data-field="focus_keywords"><?php esc_html_e( 'Kopieer', 'groq-ai-product-text' ); ?></button>
-										<button type="button" class="button groq-ai-apply-field" data-field="focus_keywords"><?php esc_html_e( 'Vul focus keyphrase in', 'groq-ai-product-text' ); ?></button>
+										<button type="button" class="button button-secondary groq-ai-copy-field" data-field="focus_keywords"><?php esc_html_e( 'Kopieer', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
+										<button type="button" class="button groq-ai-apply-field" data-field="focus_keywords"><?php esc_html_e( 'Vul focus keyphrase in', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
 										<span class="groq-ai-apply-status" aria-hidden="true"></span>
 									</div>
 								</div>
-								<textarea rows="2" placeholder="<?php esc_attr_e( 'bijv. luxe massage apparaat, wellness cadeau', 'groq-ai-product-text' ); ?>"></textarea>
+								<textarea rows="2" placeholder="<?php esc_attr_e( 'bijv. luxe massage apparaat, wellness cadeau', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>"></textarea>
 							</div>
 						<?php endif; ?>
 					</div>
 					<div class="groq-ai-modal__raw">
-						<h4><?php esc_html_e( 'Ruwe JSON-output', 'groq-ai-product-text' ); ?></h4>
+						<h4><?php esc_html_e( 'Ruwe JSON-output', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h4>
 						<pre id="groq-ai-output"></pre>
-						<button type="button" class="button groq-ai-copy-json"><?php esc_html_e( 'Kopieer JSON', 'groq-ai-product-text' ); ?></button>
+						<button type="button" class="button groq-ai-copy-json"><?php esc_html_e( 'Kopieer JSON', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
 					</div>
 				</div>
 					<div class="groq-ai-modal__status" aria-live="polite"></div>

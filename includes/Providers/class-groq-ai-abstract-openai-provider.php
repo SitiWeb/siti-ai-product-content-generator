@@ -16,7 +16,7 @@ abstract class Groq_AI_Abstract_OpenAI_Provider implements Groq_AI_Provider_Inte
 	public function fetch_live_models( $api_key ) {
 		$endpoint = $this->get_models_endpoint();
 		if ( empty( $endpoint ) ) {
-			return new WP_Error( 'groq_ai_models_endpoint_missing', __( 'Geen model-endpoint beschikbaar voor deze aanbieder.', 'groq-ai-product-text' ) );
+			return new WP_Error( 'groq_ai_models_endpoint_missing', __( 'Geen model-endpoint beschikbaar voor deze aanbieder.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
 		}
 
 		$response = wp_remote_get(
@@ -41,7 +41,7 @@ abstract class Groq_AI_Abstract_OpenAI_Provider implements Groq_AI_Provider_Inte
 		}
 
 		if ( empty( $body['data'] ) || ! is_array( $body['data'] ) ) {
-			return new WP_Error( 'groq_ai_empty_response', __( 'Geen modeldata ontvangen.', 'groq-ai-product-text' ) );
+			return new WP_Error( 'groq_ai_empty_response', __( 'Geen modeldata ontvangen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
 		}
 
 		$models = [];
@@ -52,7 +52,7 @@ abstract class Groq_AI_Abstract_OpenAI_Provider implements Groq_AI_Provider_Inte
 		}
 
 		if ( empty( $models ) ) {
-			return new WP_Error( 'groq_ai_empty_response', __( 'Geen modeldata ontvangen.', 'groq-ai-product-text' ) );
+			return new WP_Error( 'groq_ai_empty_response', __( 'Geen modeldata ontvangen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
 		}
 
 		return $models;
@@ -66,7 +66,7 @@ abstract class Groq_AI_Abstract_OpenAI_Provider implements Groq_AI_Provider_Inte
 		$api_key      = $this->get_api_key( $settings );
 
 		if ( empty( $api_key ) ) {
-			return new WP_Error( 'groq_ai_missing_api_key', sprintf( __( 'Stel eerst de API-sleutel voor %s in.', 'groq-ai-product-text' ), $this->get_label() ) );
+			return new WP_Error( 'groq_ai_missing_api_key', sprintf( __( 'Stel eerst de API-sleutel voor %s in.', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $this->get_label() ) );
 		}
 
 		$messages = [
@@ -116,7 +116,7 @@ abstract class Groq_AI_Abstract_OpenAI_Provider implements Groq_AI_Provider_Inte
 		if ( empty( $body['choices'][0]['message']['content'] ) ) {
 			return new WP_Error(
 				'groq_ai_empty_response',
-				sprintf( __( 'Geen antwoord ontvangen van %s.', 'groq-ai-product-text' ), $this->get_label() )
+				sprintf( __( 'Geen antwoord ontvangen van %s.', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $this->get_label() )
 			);
 		}
 

@@ -28,6 +28,8 @@
 			rankMathAction: field.getAttribute('data-rankmath-action') || '',
 			status: field.querySelector('.groq-ai-apply-status') || null,
 			statusTimer: null,
+			suggestionWrapper: field.querySelector('[data-title-suggestions]') || null,
+			suggestionOptions: field.querySelector('[data-title-suggestions-options]') || null,
 		};
 	});
 
@@ -92,8 +94,8 @@
 		statusField.setAttribute('data-status', type);
 	}
 
-	const loadingText = window.wp && wp.i18n ? wp.i18n.__('AI is bezig met schrijven...', 'groq-ai-product-text') : 'AI is bezig met schrijven...';
-	const retryText = window.wp && wp.i18n ? wp.i18n.__('Probeer het opnieuw of pas je prompt/context aan.', 'groq-ai-product-text') : 'Probeer het opnieuw of pas je prompt/context aan.';
+	const loadingText = window.wp && wp.i18n ? wp.i18n.__('AI is bezig met schrijven...', 'siti-ai-product-content-generator') : 'AI is bezig met schrijven...';
+	const retryText = window.wp && wp.i18n ? wp.i18n.__('Probeer het opnieuw of pas je prompt/context aan.', 'siti-ai-product-content-generator') : 'Probeer het opnieuw of pas je prompt/context aan.';
 
 	function toggleLoading(isLoading) {
 		modal.classList.toggle('is-loading', isLoading);
@@ -120,6 +122,7 @@
 				jsonCopyButton.disabled = true;
 			}
 			resetFieldStatuses();
+			clearTitleSuggestions();
 
 			fetch(GroqAIGenerator.ajaxUrl, {
 				method: 'POST',
@@ -142,6 +145,7 @@
 								entry.textarea.value = fields[key] || '';
 							}
 						});
+						updateTitleSuggestions(fields.title_suggestions);
 						resultField.textContent = (json.data.raw || '').trim();
 						resultWrapper.hidden = false;
 						if (jsonCopyButton) {
@@ -317,6 +321,8 @@
 				return ['textarea[name="rank_math_description"]'];
 			case 'focus_keywords':
 				return ['input[name="rank_math_focus_keyword"]'];
+			case 'slug':
+				return ['#post_name', 'input[name="post_name"]', '#new-post-slug'];
 			default:
 				return [];
 		}
@@ -354,6 +360,89 @@
 				.catch(() => {
 					setStatus('Kopiëren mislukt.', 'error');
 				});
+		});
+	}
+
+	function clearTitleSuggestions() {
+		const entry = resultFields.title;
+		if (!entry || !entry.suggestionWrapper || !entry.suggestionOptions) {
+			return;
+		}
+		entry.suggestionOptions.innerHTML = '';
+		entry.suggestionWrapper.hidden = true;
+	}
+
+	function updateTitleSuggestions(options) {
+		const entry = resultFields.title;
+		if (!entry || !entry.suggestionWrapper || !entry.suggestionOptions) {
+			return;
+		}
+
+		entry.suggestionOptions.innerHTML = '';
+
+		const sanitized = Array.isArray(options)
+			? options
+					.map((option) => (typeof option === 'string' ? option.trim() : ''))
+					.filter((option) => option.length > 0)
+					.slice(0, 3)
+			: [];
+
+		if (!sanitized.length) {
+			entry.suggestionWrapper.hidden = true;
+			return;
+		}
+
+		entry.suggestionWrapper.hidden = false;
+
+		const currentValue = entry.textarea ? entry.textarea.value.trim() : '';
+		const normalizedCurrent = currentValue.toLowerCase();
+		let selectedValue = '';
+
+		if (normalizedCurrent) {
+			const matched = sanitized.find((text) => text.toLowerCase() === normalizedCurrent);
+			if (matched) {
+				selectedValue = matched;
+				if (entry.textarea) {
+					entry.textarea.value = matched;
+				}
+			}
+		}
+
+		if (!selectedValue) {
+			selectedValue = sanitized[0];
+			if (entry.textarea) {
+				entry.textarea.value = sanitized[0];
+			}
+		}
+
+		const groupName = `groq-ai-title-option-${Date.now()}`;
+
+		sanitized.forEach((text, index) => {
+			const optionId = `${groupName}-${index}`;
+			const optionWrapper = document.createElement('label');
+			optionWrapper.className = 'groq-ai-title-suggestions__option';
+
+			const radio = document.createElement('input');
+			radio.type = 'radio';
+			radio.name = groupName;
+			radio.id = optionId;
+			radio.value = text;
+			if (text === selectedValue) {
+				radio.checked = true;
+			}
+
+			radio.addEventListener('change', () => {
+				if (entry.textarea) {
+					entry.textarea.value = text;
+				}
+			});
+
+			const textSpan = document.createElement('span');
+			textSpan.textContent = text;
+
+			optionWrapper.appendChild(radio);
+			optionWrapper.appendChild(textSpan);
+			entry.suggestionOptions.appendChild(optionWrapper);
 		});
 	}
 
