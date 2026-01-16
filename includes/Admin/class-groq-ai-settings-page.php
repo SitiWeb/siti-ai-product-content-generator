@@ -165,6 +165,8 @@ class Groq_AI_Product_Text_Settings_Page {
 			[
 				'taxonomy' => 'product_cat',
 				'hide_empty' => false,
+				'orderby' => 'name',
+				'order' => 'ASC',
 				'number' => 0,
 			]
 		);
@@ -230,6 +232,8 @@ class Groq_AI_Product_Text_Settings_Page {
 			[
 				'taxonomy' => $taxonomy,
 				'hide_empty' => false,
+				'orderby' => 'name',
+				'order' => 'ASC',
 				'number' => 0,
 			]
 		);

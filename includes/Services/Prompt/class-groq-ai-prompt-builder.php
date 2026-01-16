@@ -55,6 +55,145 @@ class Groq_AI_Prompt_Builder {
 		);
 	}
 
+	private function detect_brand_taxonomy() {
+		$candidates = [
+			'product_brand',
+			'pwb-brand',
+			'yith_product_brand',
+			'berocket_brand',
+		];
+
+		if ( taxonomy_exists( 'pa_brand' ) ) {
+			array_unshift( $candidates, 'pa_brand' );
+		}
+
+		$candidates = apply_filters( 'groq_ai_brand_taxonomy_candidates', $candidates );
+		$found = '';
+		foreach ( $candidates as $tax ) {
+			$tax = sanitize_key( (string) $tax );
+			if ( $tax && taxonomy_exists( $tax ) ) {
+				$found = $tax;
+				break;
+			}
+		}
+
+		$found = apply_filters( 'groq_ai_brand_taxonomy', $found );
+		return sanitize_key( (string) $found );
+	}
+
+	private function get_internal_link_suggestions( $taxonomy, $current_term_id, $limit = 10 ) {
+		$taxonomy        = sanitize_key( (string) $taxonomy );
+		$current_term_id = absint( $current_term_id );
+		$limit           = max( 0, min( 50, absint( $limit ) ) );
+		if ( '' === $taxonomy || $limit <= 0 || ! taxonomy_exists( $taxonomy ) ) {
+			return [];
+		}
+
+		$cache_key = 'groq_ai_internal_links_' . $taxonomy;
+		$cached    = get_transient( $cache_key );
+		if ( is_array( $cached ) ) {
+			$all = $cached;
+		} else {
+			$terms = get_terms(
+				[
+					'taxonomy'   => $taxonomy,
+					'hide_empty' => false,
+					'orderby'    => 'name',
+					'order'      => 'ASC',
+					'number'     => 0,
+				]
+			);
+			if ( is_wp_error( $terms ) ) {
+				$terms = [];
+			}
+
+			$all = [];
+			foreach ( (array) $terms as $t ) {
+				if ( ! $t || ! is_object( $t ) || empty( $t->term_id ) ) {
+					continue;
+				}
+				$link = get_term_link( $t );
+				if ( is_wp_error( $link ) || ! is_string( $link ) || '' === $link ) {
+					continue;
+				}
+				$name = isset( $t->name ) ? trim( wp_strip_all_tags( (string) $t->name ) ) : '';
+				if ( '' === $name ) {
+					continue;
+				}
+				$all[] = [
+					'term_id' => absint( $t->term_id ),
+					'name'    => $name,
+					'url'     => esc_url_raw( $link ),
+				];
+			}
+
+			set_transient( $cache_key, $all, HOUR_IN_SECONDS );
+		}
+
+		$suggestions = [];
+		foreach ( $all as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+			$tid = isset( $row['term_id'] ) ? absint( $row['term_id'] ) : 0;
+			if ( $current_term_id && $tid === $current_term_id ) {
+				continue;
+			}
+			$name = isset( $row['name'] ) ? (string) $row['name'] : '';
+			$url  = isset( $row['url'] ) ? (string) $row['url'] : '';
+			if ( '' === $name || '' === $url ) {
+				continue;
+			}
+			$suggestions[] = [
+				'name' => $name,
+				'url'  => $url,
+			];
+			if ( count( $suggestions ) >= $limit ) {
+				break;
+			}
+		}
+
+		return $suggestions;
+	}
+
+	private function build_internal_links_context( $term ) {
+		if ( ! $term || ! is_object( $term ) ) {
+			return '';
+		}
+		$current_tax = isset( $term->taxonomy ) ? sanitize_key( (string) $term->taxonomy ) : '';
+		$current_id  = isset( $term->term_id ) ? absint( $term->term_id ) : 0;
+
+		$links = [];
+
+		// Categories.
+		if ( taxonomy_exists( 'product_cat' ) ) {
+			$links = array_merge( $links, $this->get_internal_link_suggestions( 'product_cat', 'product_cat' === $current_tax ? $current_id : 0, 10 ) );
+		}
+
+		// Brands.
+		$brand_tax = $this->detect_brand_taxonomy();
+		if ( '' !== $brand_tax ) {
+			$links = array_merge( $links, $this->get_internal_link_suggestions( $brand_tax, $brand_tax === $current_tax ? $current_id : 0, 10 ) );
+		}
+
+		if ( empty( $links ) ) {
+			return '';
+		}
+
+		$lines = [];
+		$lines[] = __( 'Interne links (gebruik 2–5 relevante links in de tekst, als HTML: <a href="URL">Anker</a>):', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+		foreach ( $links as $link ) {
+			$name = isset( $link['name'] ) ? (string) $link['name'] : '';
+			$url  = isset( $link['url'] ) ? (string) $link['url'] : '';
+			if ( '' === $name || '' === $url ) {
+				continue;
+			}
+			$lines[] = sprintf( '- %s → %s', $name, $url );
+		}
+
+		return implode( "\n", $lines );
+	}
+
 	public function append_response_instructions( $prompt, $settings ) {
 		$instructions = (string) ( $this->get_structured_response_instructions( $settings ) ?? '' );
 		$prompt       = trim( (string) $prompt );
@@ -296,6 +435,12 @@ class Groq_AI_Prompt_Builder {
 			}
 		}
 
+		$internal_links = $this->build_internal_links_context( $term );
+		$internal_links = trim( (string) $internal_links );
+		if ( '' !== $internal_links ) {
+			$parts[] = $internal_links;
+		}
+
 		$google_context = apply_filters( 'groq_ai_term_google_context', '', $term, $settings );
 		$google_context = trim( (string) $google_context );
 		if ( '' !== $google_context ) {
@@ -456,6 +601,7 @@ class Groq_AI_Prompt_Builder {
 		);
 
 		$instruction .= ' ' . __( 'Zorg dat description geldige HTML bevat (gebruik minimaal <p>-tags en waar relevant lijstjes of benadrukking). Voeg geen extra tekst buiten het JSON-object toe.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+		$instruction .= ' ' . __( 'Als in de context een sectie "Interne links" staat, verwerk dan 2–5 van deze links natuurlijk in de description als HTML-links (<a href="URL">Anker</a>).', GROQ_AI_PRODUCT_TEXT_DOMAIN );
 		return $instruction;
 	}
 

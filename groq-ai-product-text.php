@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SitiAI Product Teksten
  * Description: Genereer productteksten met diverse AI-aanbieders rechtstreeks vanuit WooCommerce.
- * Version: 1.4.1
+ * Version: 1.4.2
  * Author: SitiAI
  * Text Domain: siti-ai-product-content-generator
  * Domain Path: /languages
