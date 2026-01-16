@@ -29,6 +29,32 @@ class Groq_AI_Prompt_Builder {
 		);
 	}
 
+	public function build_term_system_prompt( $settings, $conversation_id, $term ) {
+		$context          = isset( $settings['store_context'] ) ? trim( $settings['store_context'] ) : '';
+		$term_name        = is_object( $term ) && isset( $term->name ) ? (string) $term->name : '';
+		$base_instruction = __( 'Je bent een copywriter voor een WooCommerce winkel en schrijft SEO-vriendelijke categorie- en merkpagina teksten.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+
+		if ( $context ) {
+			$base_instruction = sprintf(
+				__( 'Je bent een copywriter voor een WooCommerce winkel. Gebruik de volgende winkelcontext indien beschikbaar: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				$context
+			);
+		}
+
+		if ( '' !== $term_name ) {
+			$base_instruction .= ' ' . sprintf(
+				__( 'Je schrijft nu voor de term: %s.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				$term_name
+			);
+		}
+
+		return sprintf(
+			__( 'Conversatie-ID: %1$s. %2$s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			$conversation_id,
+			$base_instruction
+		);
+	}
+
 	public function append_response_instructions( $prompt, $settings ) {
 		$instructions = (string) ( $this->get_structured_response_instructions( $settings ) ?? '' );
 		$prompt       = trim( (string) $prompt );
@@ -230,6 +256,243 @@ class Groq_AI_Prompt_Builder {
 		$intro = __( 'Gebruik de volgende productcontext bij het schrijven:', GROQ_AI_PRODUCT_TEXT_DOMAIN );
 
 		return $intro . "\n" . $context . "\n\n" . $prompt;
+	}
+
+	public function build_term_context_block( $term, $options = [], $settings = null ) {
+		if ( ! $term || ! is_object( $term ) ) {
+			return '';
+		}
+
+		$taxonomy = isset( $term->taxonomy ) ? sanitize_key( (string) $term->taxonomy ) : '';
+		$term_id  = isset( $term->term_id ) ? absint( $term->term_id ) : 0;
+		if ( '' === $taxonomy || ! $term_id ) {
+			return '';
+		}
+
+		$include_top_products = ! empty( $options['include_top_products'] );
+		$top_products_limit   = isset( $options['top_products_limit'] ) ? absint( $options['top_products_limit'] ) : 10;
+		$top_products_limit   = max( 1, min( 25, $top_products_limit ) );
+
+		$parts = [];
+		$parts[] = sprintf( __( 'Term: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), wp_strip_all_tags( (string) $term->name ) );
+		if ( isset( $term->slug ) && '' !== (string) $term->slug ) {
+			$parts[] = sprintf( __( 'Slug: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), sanitize_title( (string) $term->slug ) );
+		}
+		if ( isset( $term->count ) ) {
+			$parts[] = sprintf( __( 'Aantal producten: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), (string) absint( $term->count ) );
+		}
+		if ( isset( $term->description ) && '' !== trim( (string) $term->description ) ) {
+			$parts[] = sprintf( __( 'Huidige omschrijving: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), wp_strip_all_tags( (string) $term->description ) );
+		}
+
+		if ( $include_top_products ) {
+			$top_products = $this->get_top_products_for_term( $taxonomy, $term_id, $top_products_limit );
+			if ( ! empty( $top_products ) ) {
+				$lines = [];
+				foreach ( $top_products as $product_row ) {
+					$lines[] = sprintf( '- %s', $product_row );
+				}
+				$parts[] = __( 'Top verkochte producten (indicatief):', GROQ_AI_PRODUCT_TEXT_DOMAIN ) . "\n" . implode( "\n", $lines );
+			}
+		}
+
+		$google_context = apply_filters( 'groq_ai_term_google_context', '', $term, $settings );
+		$google_context = trim( (string) $google_context );
+		if ( '' !== $google_context ) {
+			$parts[] = $google_context;
+		}
+
+		return implode( "\n\n", array_filter( $parts ) );
+	}
+
+	public function prepend_term_context_to_prompt( $prompt, $context ) {
+		$context = trim( (string) $context );
+		if ( '' === $context ) {
+			return $prompt;
+		}
+		$intro = __( 'Gebruik de volgende categorie/term-context bij het schrijven:', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+		return $intro . "\n" . $context . "\n\n" . $prompt;
+	}
+
+	public function get_term_response_format_definition( $settings = null ) {
+		$rankmath_enabled = $this->settings_manager->is_module_enabled( 'rankmath', $settings );
+		$keyword_limit    = $this->settings_manager->get_rankmath_focus_keyword_limit( $settings );
+		$title_pixels     = $this->settings_manager->get_rankmath_meta_title_pixel_limit( $settings );
+		$desc_pixels      = $this->settings_manager->get_rankmath_meta_description_pixel_limit( $settings );
+
+		$properties = [
+			'description' => [
+				'type'        => 'string',
+				'description' => __( 'HTML-omschrijving voor de categorie/term met paragrafen en eventueel lijstjes.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'minLength'   => 20,
+			],
+		];
+
+		if ( $rankmath_enabled ) {
+			$properties['meta_title'] = [
+				'type'        => 'string',
+				'description' => sprintf(
+					__( 'SEO-meta title (max. %1$d tekens en %2$d pixels).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					60,
+					$title_pixels
+				),
+				'maxLength'   => 120,
+			];
+			$properties['meta_description'] = [
+				'type'        => 'string',
+				'description' => sprintf(
+					__( 'SEO-meta description (max. %1$d tekens en %2$d pixels).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					160,
+					$desc_pixels
+				),
+				'maxLength'   => 320,
+			];
+			$properties['focus_keywords'] = [
+				'type'        => 'array',
+				'description' => __( 'Lijst met korte zoekwoorden zonder hashtags of extra tekst.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'maxItems'    => max( 1, $keyword_limit ),
+				'items'       => [
+					'type'      => 'string',
+					'minLength' => 1,
+				],
+			];
+		}
+
+		$schema = [
+			'type'                 => 'object',
+			'properties'           => $properties,
+			'required'             => [ 'description' ],
+			'additionalProperties' => false,
+		];
+
+		return [
+			'type'        => 'json_schema',
+			'json_schema' => [
+				'name'   => 'groq_ai_term_text',
+				'schema' => $schema,
+			],
+		];
+	}
+
+	public function append_term_response_instructions( $prompt, $settings ) {
+		$instructions = (string) ( $this->get_term_structured_response_instructions( $settings ) ?? '' );
+		$prompt       = trim( (string) $prompt );
+		if ( '' === $instructions ) {
+			return $prompt;
+		}
+		if ( false !== strpos( $prompt, $instructions ) ) {
+			return $prompt;
+		}
+		return $prompt . "\n\n" . $instructions;
+	}
+
+	public function parse_term_structured_response( $raw, $settings = null ) {
+		if ( empty( $raw ) ) {
+			return new WP_Error( 'groq_ai_empty_response', __( 'Geen data ontvangen van de AI.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
+		}
+
+		$clean = trim( (string) $raw );
+		if ( preg_match( '/```(?:json)?\s*(.*?)```/is', $clean, $matches ) ) {
+			$clean = trim( $matches[1] );
+		}
+
+		$decoded = json_decode( $clean, true );
+		if ( ! is_array( $decoded ) ) {
+			// Fallback: treat as plain text.
+			return [
+				'description' => trim( (string) $raw ),
+			];
+		}
+
+		$description = isset( $decoded['description'] ) ? trim( (string) $decoded['description'] ) : '';
+		if ( '' === $description ) {
+			return new WP_Error( 'groq_ai_parse_error', __( 'De AI-respons bevatte geen description veld.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
+		}
+
+		$result = [
+			'description' => $description,
+		];
+
+		if ( isset( $decoded['meta_title'] ) ) {
+			$result['meta_title'] = $this->truncate_meta_field( (string) $decoded['meta_title'], 60 );
+		}
+		if ( isset( $decoded['meta_description'] ) ) {
+			$result['meta_description'] = $this->truncate_meta_field( (string) $decoded['meta_description'], 160 );
+		}
+		if ( isset( $decoded['focus_keywords'] ) ) {
+			if ( is_array( $decoded['focus_keywords'] ) ) {
+				$keywords = [];
+				foreach ( $decoded['focus_keywords'] as $kw ) {
+					$kw = trim( (string) $kw );
+					if ( '' !== $kw ) {
+						$keywords[] = $kw;
+					}
+				}
+				$keywords = array_values( array_unique( $keywords ) );
+				$result['focus_keywords'] = implode( ', ', $keywords );
+			}
+		}
+
+		return $result;
+	}
+
+	private function get_term_structured_response_instructions( $settings = null ) {
+		$schema_parts = [
+			'"description":"..."',
+		];
+
+		$rankmath_enabled = $this->settings_manager->is_module_enabled( 'rankmath', $settings );
+		if ( $rankmath_enabled ) {
+			$schema_parts[] = '"meta_title":"..."';
+			$schema_parts[] = '"meta_description":"..."';
+			$schema_parts[] = '"focus_keywords":["...","..."]';
+		}
+
+		$json_structure = '{' . implode( ',', $schema_parts ) . '}';
+
+		$instruction = sprintf(
+			__( 'Geef ALLEEN een geldig JSON-object terug met deze structuur: %s. Gebruik dubbele aanhalingstekens, geen Markdown of extra tekst. Gebruik \n voor regeleinden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			$json_structure
+		);
+
+		$instruction .= ' ' . __( 'Zorg dat description geldige HTML bevat (gebruik minimaal <p>-tags en waar relevant lijstjes of benadrukking). Voeg geen extra tekst buiten het JSON-object toe.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+		return $instruction;
+	}
+
+	private function get_top_products_for_term( $taxonomy, $term_id, $limit = 10 ) {
+		$taxonomy = sanitize_key( (string) $taxonomy );
+		$term_id  = absint( $term_id );
+		$limit    = max( 1, min( 25, absint( $limit ) ) );
+
+		$query = new WP_Query(
+			[
+				'post_type'      => 'product',
+				'post_status'    => 'publish',
+				'posts_per_page' => $limit,
+				'no_found_rows'  => true,
+				'meta_key'       => 'total_sales',
+				'orderby'        => 'meta_value_num',
+				'order'          => 'DESC',
+				'tax_query'      => [
+					[
+						'taxonomy' => $taxonomy,
+						'field'    => 'term_id',
+						'terms'    => [ $term_id ],
+					],
+				],
+			]
+		);
+
+		$rows = [];
+		if ( $query->have_posts() ) {
+			foreach ( $query->posts as $post ) {
+				$title = isset( $post->post_title ) ? wp_strip_all_tags( (string) $post->post_title ) : '';
+				$rows[] = $title;
+			}
+		}
+		wp_reset_postdata();
+
+		return array_values( array_filter( $rows ) );
 	}
 
 	public function get_response_format_definition( $settings = null ) {

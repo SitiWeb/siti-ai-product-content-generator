@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SitiAI Product Teksten
  * Description: Genereer productteksten met diverse AI-aanbieders rechtstreeks vanuit WooCommerce.
- * Version: 1.3.0
+ * Version: 1.4.0
  * Author: SitiAI
  * Text Domain: siti-ai-product-content-generator
  * Domain Path: /languages
@@ -54,6 +54,10 @@ require_once __DIR__ . '/includes/Services/Settings/class-groq-ai-settings-manag
 require_once __DIR__ . '/includes/Services/Prompt/class-groq-ai-prompt-builder.php';
 require_once __DIR__ . '/includes/Services/Conversations/class-groq-ai-conversation-manager.php';
 require_once __DIR__ . '/includes/Services/Logging/class-groq-ai-generation-logger.php';
+require_once __DIR__ . '/includes/Services/Google/class-groq-ai-google-oauth-client.php';
+require_once __DIR__ . '/includes/Services/Google/class-groq-ai-google-search-console-client.php';
+require_once __DIR__ . '/includes/Services/Google/class-groq-ai-google-analytics-data-client.php';
+require_once __DIR__ . '/includes/Services/Google/class-groq-ai-google-context-builder.php';
 require_once __DIR__ . '/includes/Admin/class-groq-ai-settings-page.php';
 require_once __DIR__ . '/includes/Admin/class-groq-ai-logs-table.php';
 require_once __DIR__ . '/includes/Admin/class-groq-ai-product-ui.php';
@@ -108,6 +112,7 @@ final class Groq_AI_Product_Text_Plugin {
 		add_action( 'init', [ $this, 'load_textdomain' ] );
 		add_action( 'plugins_loaded', [ $this, 'maybe_create_logs_table' ] );
 		add_action( 'load-plugins.php', [ $this, 'maybe_deactivate_if_woocommerce_missing' ] );
+		add_filter( 'groq_ai_term_google_context', [ $this, 'inject_google_term_context' ], 10, 3 );
 	}
 
 	public function load_textdomain() {
@@ -179,8 +184,45 @@ final class Groq_AI_Product_Text_Plugin {
 			}
 		);
 
+		$this->container->set(
+			'google_oauth_client',
+			function () {
+				return new Groq_AI_Google_OAuth_Client();
+			}
+		);
+
+		$this->container->set(
+			'gsc_client',
+			function ( Groq_AI_Service_Container $container ) {
+				return new Groq_AI_Google_Search_Console_Client( $container->get( 'google_oauth_client' ) );
+			}
+		);
+
+		$this->container->set(
+			'ga_client',
+			function ( Groq_AI_Service_Container $container ) {
+				return new Groq_AI_Google_Analytics_Data_Client( $container->get( 'google_oauth_client' ) );
+			}
+		);
+
+		$this->container->set(
+			'google_context_builder',
+			function ( Groq_AI_Service_Container $container ) {
+				return new Groq_AI_Google_Context_Builder( $container->get( 'gsc_client' ), $container->get( 'ga_client' ) );
+			}
+		);
+
 		// Instantiate controller immediately so hooks are registered.
 		$this->container->get( 'ajax_controller' );
+	}
+
+	public function inject_google_term_context( $existing, $term, $settings ) {
+		$builder = $this->container->get( 'google_context_builder' );
+		if ( ! $builder ) {
+			return (string) $existing;
+		}
+
+		return $builder->build_term_google_context( $existing, $term, $settings );
 	}
 
 	public function get_option_key() {

@@ -3,6 +3,7 @@
 class Groq_AI_Product_Text_Settings_Page {
 	private $plugin;
 	private $provider_manager;
+	private $brand_taxonomy = null;
 
 	public function __construct( $plugin, Groq_AI_Provider_Manager $provider_manager ) {
 		$this->plugin            = $plugin;
@@ -12,6 +13,11 @@ class Groq_AI_Product_Text_Settings_Page {
 		add_action( 'admin_init', [ $this, 'register_settings' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_settings_assets' ] );
 		add_action( 'admin_head', [ $this, 'hide_menu_links' ] );
+		add_action( 'admin_post_groq_ai_google_oauth_start', [ $this, 'handle_google_oauth_start' ] );
+		add_action( 'admin_post_groq_ai_google_oauth_callback', [ $this, 'handle_google_oauth_callback' ] );
+		add_action( 'admin_post_groq_ai_google_oauth_disconnect', [ $this, 'handle_google_oauth_disconnect' ] );
+		add_action( 'admin_post_groq_ai_save_term_content', [ $this, 'handle_save_term_content' ] );
+		add_action( 'admin_post_groq_ai_google_test_connection', [ $this, 'handle_google_test_connection' ] );
 	}
 
 	public function register_settings_pages() {
@@ -21,6 +27,33 @@ class Groq_AI_Product_Text_Settings_Page {
 			'manage_options',
 			'groq-ai-product-text',
 			[ $this, 'render_settings_page' ]
+		);
+
+		add_submenu_page(
+			'options-general.php',
+			__( 'Siti AI Categorie teksten', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			__( 'Siti AI Categorieën', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			'manage_options',
+			'groq-ai-product-text-categories',
+			[ $this, 'render_categories_overview_page' ]
+		);
+
+		add_submenu_page(
+			'options-general.php',
+			__( 'Siti AI Merk teksten', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			__( 'Siti AI Merken', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			'manage_options',
+			'groq-ai-product-text-brands',
+			[ $this, 'render_brands_overview_page' ]
+		);
+
+		add_submenu_page(
+			'options-general.php',
+			__( 'Siti AI Term tekst', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			__( 'Siti AI Term tekst', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			'manage_options',
+			'groq-ai-product-text-term',
+			[ $this, 'render_term_generator_page' ]
 		);
 
 		add_submenu_page(
@@ -60,11 +93,336 @@ class Groq_AI_Product_Text_Settings_Page {
 		<style>
 			#adminmenu a[href="options-general.php?page=groq-ai-product-text-modules"],
 			#adminmenu a[href="options-general.php?page=groq-ai-product-text-logs"],
-			#adminmenu a[href="options-general.php?page=groq-ai-product-text-prompts"] {
+			#adminmenu a[href="options-general.php?page=groq-ai-product-text-prompts"],
+			#adminmenu a[href="options-general.php?page=groq-ai-product-text-term"] {
 				display: none !important;
 			}
 		</style>
 		<?php
+	}
+
+	private function count_words( $text ) {
+		$text = wp_strip_all_tags( (string) $text );
+		$text = trim( preg_replace( '/\s+/u', ' ', $text ) );
+		if ( '' === $text ) {
+			return 0;
+		}
+		if ( preg_match_all( '/\pL[\pL\pN\']*/u', $text, $matches ) ) {
+			return count( $matches[0] );
+		}
+		return 0;
+	}
+
+	private function detect_brand_taxonomy() {
+		if ( null !== $this->brand_taxonomy ) {
+			return $this->brand_taxonomy;
+		}
+
+		$candidates = [
+			'product_brand',
+			'pwb-brand',
+			'yith_product_brand',
+			'berocket_brand',
+		];
+
+		// Attribute-taxonomy fallback (vaak pa_brand).
+		if ( taxonomy_exists( 'pa_brand' ) ) {
+			array_unshift( $candidates, 'pa_brand' );
+		}
+
+		$candidates = apply_filters( 'groq_ai_brand_taxonomy_candidates', $candidates );
+		$found = '';
+		foreach ( $candidates as $tax ) {
+			$tax = sanitize_key( (string) $tax );
+			if ( $tax && taxonomy_exists( $tax ) ) {
+				$found = $tax;
+				break;
+			}
+		}
+
+		$found = apply_filters( 'groq_ai_brand_taxonomy', $found );
+		$this->brand_taxonomy = sanitize_key( (string) $found );
+		return $this->brand_taxonomy;
+	}
+
+	private function get_term_page_url( $taxonomy, $term_id ) {
+		return add_query_arg(
+			[
+				'page' => 'groq-ai-product-text-term',
+				'taxonomy' => sanitize_key( (string) $taxonomy ),
+				'term_id' => absint( $term_id ),
+			],
+			admin_url( 'options-general.php' )
+		);
+	}
+
+	public function render_categories_overview_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$terms = get_terms(
+			[
+				'taxonomy' => 'product_cat',
+				'hide_empty' => false,
+				'number' => 0,
+			]
+		);
+		if ( is_wp_error( $terms ) ) {
+			$terms = [];
+		}
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Categorie teksten', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
+			<p><?php esc_html_e( 'Klik op een categorie om teksten te genereren en instellingen te beheren. De tabel toont de huidige woordlengte van de categorie-omschrijving.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+			<table class="widefat striped">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Categorie', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
+						<th><?php esc_html_e( 'Slug', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
+						<th><?php esc_html_e( 'Producten', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
+						<th><?php esc_html_e( 'Woorden (omschrijving)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+				<?php if ( empty( $terms ) ) : ?>
+					<tr><td colspan="4"><?php esc_html_e( 'Geen categorieën gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></td></tr>
+				<?php else : ?>
+					<?php foreach ( $terms as $term ) : ?>
+						<?php
+							$link = $this->get_term_page_url( 'product_cat', $term->term_id );
+							$words = $this->count_words( $term->description );
+							$count = isset( $term->count ) ? absint( $term->count ) : 0;
+						?>
+						<tr>
+							<td>
+								<a href="<?php echo esc_url( $link ); ?>"><strong><?php echo esc_html( $term->name ); ?></strong></a>
+							</td>
+							<td><?php echo esc_html( $term->slug ); ?></td>
+							<td><?php echo esc_html( (string) $count ); ?></td>
+							<td><?php echo esc_html( (string) $words ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+				<?php endif; ?>
+				</tbody>
+			</table>
+		</div>
+		<?php
+	}
+
+	public function render_brands_overview_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$taxonomy = $this->detect_brand_taxonomy();
+		if ( '' === $taxonomy ) {
+			?>
+			<div class="wrap">
+				<h1><?php esc_html_e( 'Merk teksten', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
+				<p><?php esc_html_e( 'Geen merk-taxonomie gevonden. Installeer/activeer een merken-plugin of stel een taxonomie in via de filter groq_ai_brand_taxonomy.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+			</div>
+			<?php
+			return;
+		}
+
+		$terms = get_terms(
+			[
+				'taxonomy' => $taxonomy,
+				'hide_empty' => false,
+				'number' => 0,
+			]
+		);
+		if ( is_wp_error( $terms ) ) {
+			$terms = [];
+		}
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Merk teksten', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
+			<p>
+				<?php
+				printf(
+					/* translators: %s: taxonomy key */
+					esc_html__( 'Gedetecteerde merk-taxonomie: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					esc_html( $taxonomy )
+				);
+				?>
+			</p>
+			<table class="widefat striped">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Merk', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
+						<th><?php esc_html_e( 'Slug', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
+						<th><?php esc_html_e( 'Producten', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
+						<th><?php esc_html_e( 'Woorden (omschrijving)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+				<?php if ( empty( $terms ) ) : ?>
+					<tr><td colspan="4"><?php esc_html_e( 'Geen merken gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></td></tr>
+				<?php else : ?>
+					<?php foreach ( $terms as $term ) : ?>
+						<?php
+							$link = $this->get_term_page_url( $taxonomy, $term->term_id );
+							$words = $this->count_words( $term->description );
+							$count = isset( $term->count ) ? absint( $term->count ) : 0;
+						?>
+						<tr>
+							<td>
+								<a href="<?php echo esc_url( $link ); ?>"><strong><?php echo esc_html( $term->name ); ?></strong></a>
+							</td>
+							<td><?php echo esc_html( $term->slug ); ?></td>
+							<td><?php echo esc_html( (string) $count ); ?></td>
+							<td><?php echo esc_html( (string) $words ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+				<?php endif; ?>
+				</tbody>
+			</table>
+		</div>
+		<?php
+	}
+
+	public function render_term_generator_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$taxonomy = isset( $_GET['taxonomy'] ) ? sanitize_key( wp_unslash( $_GET['taxonomy'] ) ) : '';
+		$term_id  = isset( $_GET['term_id'] ) ? absint( $_GET['term_id'] ) : 0;
+
+		if ( '' === $taxonomy || ! taxonomy_exists( $taxonomy ) || ! $term_id ) {
+			?>
+			<div class="wrap">
+				<h1><?php esc_html_e( 'Term tekst', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
+				<p><?php esc_html_e( 'Ongeldige term.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+			</div>
+			<?php
+			return;
+		}
+
+		$term = get_term( $term_id, $taxonomy );
+		if ( ! $term || is_wp_error( $term ) ) {
+			?>
+			<div class="wrap">
+				<h1><?php esc_html_e( 'Term tekst', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
+				<p><?php esc_html_e( 'Term niet gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+			</div>
+			<?php
+			return;
+		}
+
+		$term_label = ( 'product_cat' === $taxonomy ) ? __( 'Categorie', GROQ_AI_PRODUCT_TEXT_DOMAIN ) : __( 'Term', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+		$word_count = $this->count_words( $term->description );
+		$meta_prompt = get_term_meta( $term_id, 'groq_ai_term_custom_prompt', true );
+		$default_prompt = (string) $meta_prompt;
+		if ( '' === trim( $default_prompt ) ) {
+			$default_prompt = __( 'Schrijf een SEO-vriendelijke categorieomschrijving in het Nederlands. Gebruik duidelijke tussenkoppen en <p>-tags. Voeg geen prijsinformatie toe.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+		}
+		?>
+		<div class="wrap">
+			<h1>
+				<?php echo esc_html( $term_label ); ?>: <?php echo esc_html( $term->name ); ?>
+			</h1>
+			<p>
+				<?php
+				printf(
+					/* translators: 1: taxonomy key, 2: term id, 3: word count */
+					esc_html__( 'Taxonomie: %1$s — Term ID: %2$d — Huidige omschrijving: %3$d woorden', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					esc_html( $taxonomy ),
+					(int) $term_id,
+					(int) $word_count
+				);
+				?>
+			</p>
+
+			<h2><?php esc_html_e( 'Omschrijving bewerken', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'groq_ai_save_term_content', '_wpnonce' ); ?>
+				<input type="hidden" name="action" value="groq_ai_save_term_content" />
+				<input type="hidden" name="taxonomy" value="<?php echo esc_attr( $taxonomy ); ?>" />
+				<input type="hidden" name="term_id" value="<?php echo esc_attr( (string) $term_id ); ?>" />
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><label for="description"><?php esc_html_e( 'Omschrijving', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
+						<td>
+							<textarea name="description" id="description" rows="8" class="large-text"><?php echo esc_textarea( (string) $term->description ); ?></textarea>
+							<p class="description"><?php esc_html_e( 'Dit is de standaard WordPress term-omschrijving (wordt o.a. gebruikt op categorie/merk pagina’s).', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="groq-ai-term-custom-prompt"><?php esc_html_e( 'Prompt (optioneel, per term)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
+						<td>
+							<textarea name="groq_ai_term_custom_prompt" id="groq-ai-term-custom-prompt" rows="4" class="large-text"><?php echo esc_textarea( (string) $meta_prompt ); ?></textarea>
+							<p class="description"><?php esc_html_e( 'Laat leeg om de standaard prompt te gebruiken. Deze prompt wordt gebruikt wanneer je op de knop "Genereer" klikt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+						</td>
+					</tr>
+				</table>
+				<?php submit_button( __( 'Opslaan', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ); ?>
+			</form>
+
+			<hr />
+
+			<h2><?php esc_html_e( 'Tekst genereren', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
+			<form id="groq-ai-term-form">
+				<p class="description"><?php esc_html_e( 'De AI gebruikt de winkelcontext + termcontext (o.a. top-verkopers in deze categorie/dit merk). Later voegen we Search Console/Analytics context toe.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+				<p>
+					<label>
+						<input type="checkbox" id="groq-ai-term-include-top-products" checked />
+						<?php esc_html_e( 'Top producten meenemen', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+					</label>
+					&nbsp;
+					<label>
+						<?php esc_html_e( 'Aantal:', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+						<input type="number" id="groq-ai-term-top-products-limit" value="10" min="1" max="25" style="width:80px;" />
+					</label>
+				</p>
+				<textarea id="groq-ai-term-prompt" class="large-text" rows="5"><?php echo esc_textarea( $default_prompt ); ?></textarea>
+				<p>
+					<button type="submit" class="button button-primary"><?php esc_html_e( 'Genereer', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
+					<button type="button" class="button" id="groq-ai-term-apply"><?php esc_html_e( 'Zet in omschrijving', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
+				</p>
+				<div id="groq-ai-term-status" class="description" aria-live="polite"></div>
+				<h3><?php esc_html_e( 'Gegenereerde tekst', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h3>
+				<textarea id="groq-ai-term-generated" class="large-text" rows="10"></textarea>
+				<h3><?php esc_html_e( 'Ruwe JSON-output', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h3>
+				<pre id="groq-ai-term-raw" style="background:#fff;border:1px solid #ddd;padding:12px;max-height:240px;overflow:auto;"></pre>
+			</form>
+		</div>
+		<?php
+	}
+
+	public function handle_save_term_content() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Geen toestemming.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
+		}
+
+		check_admin_referer( 'groq_ai_save_term_content' );
+
+		$taxonomy = isset( $_POST['taxonomy'] ) ? sanitize_key( wp_unslash( $_POST['taxonomy'] ) ) : '';
+		$term_id  = isset( $_POST['term_id'] ) ? absint( $_POST['term_id'] ) : 0;
+		$description = isset( $_POST['description'] ) ? wp_kses_post( wp_unslash( $_POST['description'] ) ) : '';
+		$custom_prompt = isset( $_POST['groq_ai_term_custom_prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['groq_ai_term_custom_prompt'] ) ) : '';
+
+		if ( '' === $taxonomy || ! taxonomy_exists( $taxonomy ) || ! $term_id ) {
+			wp_safe_redirect( $this->get_settings_page_url() );
+			exit;
+		}
+
+		$result = wp_update_term(
+			$term_id,
+			$taxonomy,
+			[
+				'description' => $description,
+			]
+		);
+
+		if ( ! is_wp_error( $result ) ) {
+			update_term_meta( $term_id, 'groq_ai_term_custom_prompt', $custom_prompt );
+		}
+
+		wp_safe_redirect( $this->get_term_page_url( $taxonomy, $term_id ) );
+		exit;
 	}
 
 	public function register_settings() {
@@ -73,6 +431,13 @@ class Groq_AI_Product_Text_Settings_Page {
 		add_settings_section(
 			'groq_ai_product_text_general',
 			__( 'Algemene instellingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			'__return_false',
+			'groq-ai-product-text'
+		);
+
+		add_settings_section(
+			'groq_ai_product_text_google',
+			__( 'Google koppeling (OAuth)', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			'__return_false',
 			'groq-ai-product-text'
 		);
@@ -91,6 +456,54 @@ class Groq_AI_Product_Text_Settings_Page {
 			[ $this, 'render_model_field' ],
 			'groq-ai-product-text',
 			'groq_ai_product_text_general'
+		);
+
+		add_settings_field(
+			'groq_ai_google_oauth_client_id',
+			__( 'Google Client ID', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			[ $this, 'render_google_oauth_client_id_field' ],
+			'groq-ai-product-text',
+			'groq_ai_product_text_google'
+		);
+
+		add_settings_field(
+			'groq_ai_google_oauth_client_secret',
+			__( 'Google Client secret', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			[ $this, 'render_google_oauth_client_secret_field' ],
+			'groq-ai-product-text',
+			'groq_ai_product_text_google'
+		);
+
+		add_settings_field(
+			'groq_ai_google_oauth_status',
+			__( 'Google status', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			[ $this, 'render_google_oauth_status_field' ],
+			'groq-ai-product-text',
+			'groq_ai_product_text_google'
+		);
+
+		add_settings_field(
+			'groq_ai_google_gsc_site_url',
+			__( 'Search Console site URL', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			[ $this, 'render_google_gsc_site_url_field' ],
+			'groq-ai-product-text',
+			'groq_ai_product_text_google'
+		);
+
+		add_settings_field(
+			'groq_ai_google_ga4_property_id',
+			__( 'GA4 property ID', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			[ $this, 'render_google_ga4_property_id_field' ],
+			'groq-ai-product-text',
+			'groq_ai_product_text_google'
+		);
+
+		add_settings_field(
+			'groq_ai_google_context_toggles',
+			__( 'Google data gebruiken', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			[ $this, 'render_google_context_toggles_field' ],
+			'groq-ai-product-text',
+			'groq_ai_product_text_google'
 		);
 
 		foreach ( $this->provider_manager->get_providers() as $provider ) {
@@ -223,6 +636,7 @@ class Groq_AI_Product_Text_Settings_Page {
 		?>
 		<div class="wrap">
 			<h1><?php esc_html_e( 'Siti AI Productteksten', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
+			<?php $this->render_google_oauth_admin_notice(); ?>
 			<p style="margin-bottom:16px;">
 				<a href="<?php echo esc_url( admin_url( 'admin.php?page=groq-ai-product-text-prompts' ) ); ?>" class="button button-primary">
 					<?php esc_html_e( 'Prompt instellingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
@@ -244,6 +658,521 @@ class Groq_AI_Product_Text_Settings_Page {
 			</form>
 		</div>
 		<?php
+	}
+
+	private function get_google_oauth_redirect_uri() {
+		return admin_url( 'admin-post.php?action=groq_ai_google_oauth_callback' );
+	}
+
+	private function get_google_oauth_scopes() {
+		return [
+			'openid',
+			'email',
+			'https://www.googleapis.com/auth/webmasters.readonly',
+			'https://www.googleapis.com/auth/analytics.readonly',
+		];
+	}
+
+	private function get_google_oauth_state_key() {
+		return 'groq_ai_google_oauth_state_' . get_current_user_id();
+	}
+
+	private function get_settings_page_url() {
+		return admin_url( 'options-general.php?page=groq-ai-product-text' );
+	}
+
+	private function render_google_oauth_admin_notice() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$status  = isset( $_GET['groq_ai_google_oauth'] ) ? sanitize_text_field( wp_unslash( $_GET['groq_ai_google_oauth'] ) ) : '';
+		$message = isset( $_GET['groq_ai_google_oauth_message'] ) ? sanitize_text_field( rawurldecode( wp_unslash( $_GET['groq_ai_google_oauth_message'] ) ) ) : '';
+
+		if ( '' === $status ) {
+			return;
+		}
+
+		$type = 'info';
+		if ( 'success' === $status ) {
+			$type = 'success';
+		} elseif ( 'error' === $status ) {
+			$type = 'error';
+		}
+
+		if ( '' === $message ) {
+			if ( 'success' === $status ) {
+				$message = __( 'Google koppeling bijgewerkt.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+			} elseif ( 'error' === $status ) {
+				$message = __( 'Google koppeling mislukt.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+			}
+		}
+		?>
+		<div class="notice notice-<?php echo esc_attr( $type ); ?> is-dismissible">
+			<p><?php echo esc_html( $message ); ?></p>
+		</div>
+		<?php
+	}
+
+	private function get_google_test_url() {
+		return wp_nonce_url(
+			admin_url( 'admin-post.php?action=groq_ai_google_test_connection' ),
+			'groq_ai_google_test_connection',
+			'_wpnonce'
+		);
+	}
+
+	public function render_google_oauth_client_id_field() {
+		$settings = $this->plugin->get_settings();
+		$value    = isset( $settings['google_oauth_client_id'] ) ? $settings['google_oauth_client_id'] : '';
+		?>
+		<input type="text" name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[google_oauth_client_id]" value="<?php echo esc_attr( $value ); ?>" class="regular-text" autocomplete="off" />
+		<p class="description">
+			<?php esc_html_e( 'Client ID uit Google Cloud Console (OAuth 2.0 Client).', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+		</p>
+		<?php
+	}
+
+	public function render_google_oauth_client_secret_field() {
+		$settings = $this->plugin->get_settings();
+		$value    = isset( $settings['google_oauth_client_secret'] ) ? $settings['google_oauth_client_secret'] : '';
+		?>
+		<input type="password" name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[google_oauth_client_secret]" value="<?php echo esc_attr( $value ); ?>" class="regular-text" autocomplete="off" />
+		<p class="description">
+			<?php esc_html_e( 'Client secret uit Google Cloud Console. Wordt opgeslagen in de WordPress options tabel.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+		</p>
+		<?php
+	}
+
+	public function render_google_oauth_status_field() {
+		$settings      = $this->plugin->get_settings();
+		$connected     = ! empty( $settings['google_oauth_refresh_token'] );
+		$email         = isset( $settings['google_oauth_connected_email'] ) ? $settings['google_oauth_connected_email'] : '';
+		$connected_at  = isset( $settings['google_oauth_connected_at'] ) ? absint( $settings['google_oauth_connected_at'] ) : 0;
+		$redirect_uri  = $this->get_google_oauth_redirect_uri();
+
+		$start_url = wp_nonce_url(
+			admin_url( 'admin-post.php?action=groq_ai_google_oauth_start' ),
+			'groq_ai_google_oauth_start',
+			'_wpnonce'
+		);
+
+		$disconnect_url = wp_nonce_url(
+			admin_url( 'admin-post.php?action=groq_ai_google_oauth_disconnect' ),
+			'groq_ai_google_oauth_disconnect',
+			'_wpnonce'
+		);
+		?>
+		<p class="description" style="margin-top:0;">
+			<?php esc_html_e( 'Let op: als je Client ID/secret net hebt ingevuld of gewijzigd, klik eerst op "Wijzigingen opslaan" voordat je verbindt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+		</p>
+		<p class="description" style="margin-top:0;">
+			<?php esc_html_e( 'Redirect URI (kopieer deze naar Google Cloud Console):', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+			<br />
+			<code><?php echo esc_html( $redirect_uri ); ?></code>
+		</p>
+		<?php if ( $connected ) : ?>
+			<p>
+				<strong><?php esc_html_e( 'Verbonden', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
+				<?php if ( $email ) : ?>
+					— <?php echo esc_html( $email ); ?>
+				<?php endif; ?>
+				<?php if ( $connected_at ) : ?>
+					(<?php echo esc_html( date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $connected_at ) ); ?>)
+				<?php endif; ?>
+			</p>
+			<p>
+				<a class="button" href="<?php echo esc_url( $start_url ); ?>">
+					<?php esc_html_e( 'Opnieuw verbinden', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+				</a>
+				<a class="button button-secondary" href="<?php echo esc_url( $disconnect_url ); ?>" style="margin-left:8px;">
+					<?php esc_html_e( 'Ontkoppelen', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+				</a>
+			</p>
+		<?php else : ?>
+			<p><strong><?php esc_html_e( 'Niet verbonden', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong></p>
+			<p>
+				<a class="button button-primary" href="<?php echo esc_url( $start_url ); ?>">
+					<?php esc_html_e( 'Google verbinden', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+				</a>
+			</p>
+		<?php endif; ?>
+		<p class="description">
+			<?php esc_html_e( 'Deze stap doet alleen authenticatie en slaat een refresh token op. Data ophalen (Search Console / Analytics) voegen we daarna toe.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+		</p>
+		<p>
+			<a class="button" href="<?php echo esc_url( $this->get_google_test_url() ); ?>">
+				<?php esc_html_e( 'Test Google verbinding', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+			</a>
+			<span class="description" style="margin-left:8px;">
+				<?php esc_html_e( 'Doet een token refresh en (indien ingevuld) een test-call naar Search Console/GA4.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+			</span>
+		</p>
+		<?php
+	}
+
+	public function handle_google_test_connection() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Geen toestemming.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
+		}
+
+		check_admin_referer( 'groq_ai_google_test_connection' );
+
+		$settings = $this->plugin->get_settings();
+		$messages = [];
+		$status   = 'success';
+
+		$oauth = new Groq_AI_Google_OAuth_Client();
+		$token = $oauth->get_access_token( $settings );
+		if ( is_wp_error( $token ) ) {
+			$status = 'error';
+			$messages[] = sprintf( __( 'OAuth: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $token->get_error_message() );
+		} else {
+			$messages[] = __( 'OAuth: OK (access token opgehaald).', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+			$info = $oauth->get_access_token_info( $token );
+			if ( is_array( $info ) ) {
+				$scope = isset( $info['scope'] ) ? trim( (string) $info['scope'] ) : '';
+				if ( '' !== $scope ) {
+					$messages[] = sprintf( __( 'OAuth scopes: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $scope );
+					if ( false === strpos( $scope, 'https://www.googleapis.com/auth/webmasters' ) ) {
+						$messages[] = __( 'Tip: je access token mist Search Console scope. Klik op "Opnieuw verbinden" zodat je toestemming opnieuw wordt gevraagd.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+					}
+				}
+			}
+		}
+
+		$range_days = 7;
+		$end_date   = gmdate( 'Y-m-d' );
+		$start_date = gmdate( 'Y-m-d', time() - ( $range_days * DAY_IN_SECONDS ) );
+
+		if ( 'error' !== $status && ! empty( $settings['google_enable_gsc'] ) ) {
+			$gsc = new Groq_AI_Google_Search_Console_Client( $oauth );
+			$sites = $gsc->list_sites( $settings );
+			if ( is_wp_error( $sites ) ) {
+				$status = 'error';
+				$messages[] = sprintf( __( 'Search Console: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $sites->get_error_message() );
+			} else {
+				$count = is_array( $sites ) ? count( $sites ) : 0;
+				$messages[] = sprintf( __( 'Search Console: OK (%d properties zichtbaar).', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $count );
+				$site_url = isset( $settings['google_gsc_site_url'] ) ? trim( (string) $settings['google_gsc_site_url'] ) : '';
+				if ( '' !== $site_url && is_array( $sites ) && ! in_array( $site_url, $sites, true ) ) {
+					$messages[] = __( 'Let op: de ingestelde site URL is niet gevonden in jouw zichtbare GSC properties.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+				}
+			}
+		}
+
+		if ( 'error' !== $status && ! empty( $settings['google_enable_ga'] ) ) {
+			$property_id = isset( $settings['google_ga4_property_id'] ) ? trim( (string) $settings['google_ga4_property_id'] ) : '';
+			if ( '' !== $property_id ) {
+				$ga = new Groq_AI_Google_Analytics_Data_Client( $oauth );
+				$stats = $ga->get_property_sessions_summary( $settings, $property_id, $start_date, $end_date );
+				if ( is_wp_error( $stats ) ) {
+					$status = 'error';
+					$messages[] = sprintf( __( 'Analytics: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $stats->get_error_message() );
+				} else {
+					$sessions = isset( $stats['sessions'] ) ? absint( $stats['sessions'] ) : 0;
+					$messages[] = sprintf( __( 'Analytics: OK (sessies laatste %1$d dagen: ~%2$d).', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $range_days, $sessions );
+				}
+			} else {
+				$messages[] = __( 'Analytics: overgeslagen (GA4 property ID niet ingevuld).', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+			}
+		}
+
+		$url = add_query_arg(
+			[
+				'groq_ai_google_oauth' => $status,
+				'groq_ai_google_oauth_message' => implode( ' ', $messages ),
+			],
+			$this->get_settings_page_url()
+		);
+		wp_safe_redirect( $url );
+		exit;
+	}
+
+	public function render_google_gsc_site_url_field() {
+		$settings = $this->plugin->get_settings();
+		$value    = isset( $settings['google_gsc_site_url'] ) ? (string) $settings['google_gsc_site_url'] : '';
+		?>
+		<input type="url" name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[google_gsc_site_url]" value="<?php echo esc_attr( $value ); ?>" class="regular-text" placeholder="sc-domain:example.com" />
+		<p class="description">
+			<?php esc_html_e( 'Voorbeeld: sc-domain:example.com of https://www.example.com/. Moet exact overeenkomen met je property in Search Console.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+		</p>
+		<?php
+	}
+
+	public function render_google_ga4_property_id_field() {
+		$settings = $this->plugin->get_settings();
+		$value    = isset( $settings['google_ga4_property_id'] ) ? (string) $settings['google_ga4_property_id'] : '';
+		?>
+		<input type="text" name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[google_ga4_property_id]" value="<?php echo esc_attr( $value ); ?>" class="regular-text" placeholder="123456789" />
+		<p class="description">
+			<?php esc_html_e( 'GA4 property ID (cijferreeks). Nodig voor Analytics Data API.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+		</p>
+		<?php
+	}
+
+	public function render_google_context_toggles_field() {
+		$settings = $this->plugin->get_settings();
+		$gsc = ! empty( $settings['google_enable_gsc'] );
+		$ga  = ! empty( $settings['google_enable_ga'] );
+		?>
+		<label style="display:block;margin-bottom:6px;">
+			<input type="checkbox" name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[google_enable_gsc]" value="1" <?php checked( $gsc ); ?> />
+			<?php esc_html_e( 'Search Console data meesturen (queries/clicks/impressions).', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+		</label>
+		<label style="display:block;">
+			<input type="checkbox" name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[google_enable_ga]" value="1" <?php checked( $ga ); ?> />
+			<?php esc_html_e( 'Analytics (GA4) data meesturen (indicatieve sessies).', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+		</label>
+		<?php
+	}
+
+	public function handle_google_oauth_start() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Geen toestemming.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
+		}
+
+		check_admin_referer( 'groq_ai_google_oauth_start' );
+
+		$settings     = $this->plugin->get_settings();
+		$client_id    = isset( $settings['google_oauth_client_id'] ) ? trim( (string) $settings['google_oauth_client_id'] ) : '';
+		$client_secret = isset( $settings['google_oauth_client_secret'] ) ? trim( (string) $settings['google_oauth_client_secret'] ) : '';
+
+		if ( '' === $client_id || '' === $client_secret ) {
+			$url = add_query_arg(
+				[
+					'groq_ai_google_oauth' => 'error',
+					'groq_ai_google_oauth_message' => __( 'Vul eerst Google Client ID en Client secret in.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				],
+				$this->get_settings_page_url()
+			);
+			wp_safe_redirect( $url );
+			exit;
+		}
+
+		$state = wp_generate_password( 32, false, false );
+		set_transient( $this->get_google_oauth_state_key(), $state, 10 * MINUTE_IN_SECONDS );
+
+		$scope = implode( ' ', $this->get_google_oauth_scopes() );
+		$redirect_uri = $this->get_google_oauth_redirect_uri();
+
+		$auth_url = add_query_arg(
+			[
+				'client_id' => $client_id,
+				'redirect_uri' => $redirect_uri,
+				'response_type' => 'code',
+				'access_type' => 'offline',
+				'prompt' => 'consent',
+				'include_granted_scopes' => 'true',
+				'scope' => $scope,
+				'state' => $state,
+			],
+			'https://accounts.google.com/o/oauth2/v2/auth'
+		);
+		$auth_url = esc_url_raw( $auth_url );
+		$parsed   = wp_parse_url( $auth_url );
+		$host     = isset( $parsed['host'] ) ? strtolower( (string) $parsed['host'] ) : '';
+		if ( 'accounts.google.com' !== $host ) {
+			$url = add_query_arg(
+				[
+					'groq_ai_google_oauth' => 'error',
+					'groq_ai_google_oauth_message' => __( 'OAuth URL ongeldig. Controleer plugin instellingen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				],
+				$this->get_settings_page_url()
+			);
+			wp_safe_redirect( $url );
+			exit;
+		}
+
+		// Let op: wp_safe_redirect staat standaard geen externe hosts toe en valt dan terug naar /wp-admin.
+		wp_redirect( $auth_url );
+		exit;
+	}
+
+	public function handle_google_oauth_callback() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Geen toestemming.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
+		}
+
+		$expected_state = get_transient( $this->get_google_oauth_state_key() );
+		delete_transient( $this->get_google_oauth_state_key() );
+
+		$state = isset( $_GET['state'] ) ? sanitize_text_field( wp_unslash( $_GET['state'] ) ) : '';
+		$code  = isset( $_GET['code'] ) ? sanitize_text_field( wp_unslash( $_GET['code'] ) ) : '';
+		$error = isset( $_GET['error'] ) ? sanitize_text_field( wp_unslash( $_GET['error'] ) ) : '';
+
+		if ( '' !== $error ) {
+			$url = add_query_arg(
+				[
+					'groq_ai_google_oauth' => 'error',
+					'groq_ai_google_oauth_message' => sprintf( __( 'Google OAuth error: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $error ),
+				],
+				$this->get_settings_page_url()
+			);
+			wp_safe_redirect( $url );
+			exit;
+		}
+
+		if ( empty( $expected_state ) || '' === $state || $state !== $expected_state ) {
+			$url = add_query_arg(
+				[
+					'groq_ai_google_oauth' => 'error',
+					'groq_ai_google_oauth_message' => __( 'Ongeldige OAuth state. Probeer opnieuw te verbinden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				],
+				$this->get_settings_page_url()
+			);
+			wp_safe_redirect( $url );
+			exit;
+		}
+
+		if ( '' === $code ) {
+			$url = add_query_arg(
+				[
+					'groq_ai_google_oauth' => 'error',
+					'groq_ai_google_oauth_message' => __( 'Geen OAuth code ontvangen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				],
+				$this->get_settings_page_url()
+			);
+			wp_safe_redirect( $url );
+			exit;
+		}
+
+		$settings      = $this->plugin->get_settings();
+		$client_id     = isset( $settings['google_oauth_client_id'] ) ? trim( (string) $settings['google_oauth_client_id'] ) : '';
+		$client_secret = isset( $settings['google_oauth_client_secret'] ) ? trim( (string) $settings['google_oauth_client_secret'] ) : '';
+		$redirect_uri  = $this->get_google_oauth_redirect_uri();
+
+		if ( '' === $client_id || '' === $client_secret ) {
+			$url = add_query_arg(
+				[
+					'groq_ai_google_oauth' => 'error',
+					'groq_ai_google_oauth_message' => __( 'Client ID/secret ontbreken. Sla eerst de instellingen op.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				],
+				$this->get_settings_page_url()
+			);
+			wp_safe_redirect( $url );
+			exit;
+		}
+
+		$token_response = wp_remote_post(
+			'https://oauth2.googleapis.com/token',
+			[
+				'timeout' => 20,
+				'headers' => [
+					'Content-Type' => 'application/x-www-form-urlencoded',
+				],
+				'body' => [
+					'code' => $code,
+					'client_id' => $client_id,
+					'client_secret' => $client_secret,
+					'redirect_uri' => $redirect_uri,
+					'grant_type' => 'authorization_code',
+				],
+			]
+		);
+
+		if ( is_wp_error( $token_response ) ) {
+			$url = add_query_arg(
+				[
+					'groq_ai_google_oauth' => 'error',
+					'groq_ai_google_oauth_message' => $token_response->get_error_message(),
+				],
+				$this->get_settings_page_url()
+			);
+			wp_safe_redirect( $url );
+			exit;
+		}
+
+		$status_code = wp_remote_retrieve_response_code( $token_response );
+		$body        = wp_remote_retrieve_body( $token_response );
+		$data        = json_decode( (string) $body, true );
+
+		if ( 200 !== $status_code || ! is_array( $data ) ) {
+			$url = add_query_arg(
+				[
+					'groq_ai_google_oauth' => 'error',
+					'groq_ai_google_oauth_message' => __( 'Token exchange mislukt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				],
+				$this->get_settings_page_url()
+			);
+			wp_safe_redirect( $url );
+			exit;
+		}
+
+		$access_token  = isset( $data['access_token'] ) ? sanitize_text_field( (string) $data['access_token'] ) : '';
+		$refresh_token = isset( $data['refresh_token'] ) ? sanitize_text_field( (string) $data['refresh_token'] ) : '';
+
+		if ( '' === $refresh_token ) {
+			$refresh_token = isset( $settings['google_oauth_refresh_token'] ) ? sanitize_text_field( (string) $settings['google_oauth_refresh_token'] ) : '';
+		}
+
+		$connected_email = '';
+		if ( '' !== $access_token ) {
+			$userinfo_response = wp_remote_get(
+				'https://openidconnect.googleapis.com/v1/userinfo',
+				[
+					'timeout' => 20,
+					'headers' => [
+						'Authorization' => 'Bearer ' . $access_token,
+					],
+				]
+			);
+			if ( ! is_wp_error( $userinfo_response ) && 200 === wp_remote_retrieve_response_code( $userinfo_response ) ) {
+				$userinfo_body = wp_remote_retrieve_body( $userinfo_response );
+				$userinfo_data = json_decode( (string) $userinfo_body, true );
+				if ( is_array( $userinfo_data ) && ! empty( $userinfo_data['email'] ) ) {
+					$connected_email = sanitize_email( (string) $userinfo_data['email'] );
+				}
+			}
+		}
+
+		$options = get_option( $this->plugin->get_option_key(), [] );
+		if ( ! is_array( $options ) ) {
+			$options = [];
+		}
+
+		$options['google_oauth_refresh_token']   = $refresh_token;
+		$options['google_oauth_connected_email'] = $connected_email;
+		$options['google_oauth_connected_at']    = time();
+		update_option( $this->plugin->get_option_key(), $options );
+
+		$url = add_query_arg(
+			[
+				'groq_ai_google_oauth' => 'success',
+				'groq_ai_google_oauth_message' => __( 'Google succesvol verbonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			],
+			$this->get_settings_page_url()
+		);
+		wp_safe_redirect( $url );
+		exit;
+	}
+
+	public function handle_google_oauth_disconnect() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Geen toestemming.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
+		}
+
+		check_admin_referer( 'groq_ai_google_oauth_disconnect' );
+
+		$options = get_option( $this->plugin->get_option_key(), [] );
+		if ( ! is_array( $options ) ) {
+			$options = [];
+		}
+
+		$options['google_oauth_refresh_token']   = '';
+		$options['google_oauth_connected_email'] = '';
+		$options['google_oauth_connected_at']    = 0;
+		update_option( $this->plugin->get_option_key(), $options );
+
+		$url = add_query_arg(
+			[
+				'groq_ai_google_oauth' => 'success',
+				'groq_ai_google_oauth_message' => __( 'Google koppeling verwijderd.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			],
+			$this->get_settings_page_url()
+		);
+		wp_safe_redirect( $url );
+		exit;
 	}
 
 	public function render_modules_page() {
@@ -648,7 +1577,14 @@ class Groq_AI_Product_Text_Settings_Page {
 	}
 
 	public function enqueue_settings_assets( $hook ) {
-		if ( ! in_array( $hook, [ 'settings_page_groq-ai-product-text', 'settings_page_groq-ai-product-text-modules', 'settings_page_groq-ai-product-text-prompts' ], true ) ) {
+		if ( ! in_array( $hook, [
+			'settings_page_groq-ai-product-text',
+			'settings_page_groq-ai-product-text-modules',
+			'settings_page_groq-ai-product-text-prompts',
+			'settings_page_groq-ai-product-text-categories',
+			'settings_page_groq-ai-product-text-brands',
+			'settings_page_groq-ai-product-text-term',
+		], true ) ) {
 			return;
 		}
 
@@ -673,6 +1609,29 @@ class Groq_AI_Product_Text_Settings_Page {
 			GROQ_AI_PRODUCT_TEXT_VERSION,
 			true
 		);
+
+		if ( 'settings_page_groq-ai-product-text-term' === $hook ) {
+			wp_enqueue_script(
+				'groq-ai-term-admin',
+				plugins_url( 'assets/js/term-admin.js', GROQ_AI_PRODUCT_TEXT_FILE ),
+				[],
+				GROQ_AI_PRODUCT_TEXT_VERSION,
+				true
+			);
+
+			$taxonomy = isset( $_GET['taxonomy'] ) ? sanitize_key( wp_unslash( $_GET['taxonomy'] ) ) : '';
+			$term_id  = isset( $_GET['term_id'] ) ? absint( $_GET['term_id'] ) : 0;
+			wp_localize_script(
+				'groq-ai-term-admin',
+				'GroqAITermGenerator',
+				[
+					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+					'nonce'  => wp_create_nonce( 'groq_ai_generate_term' ),
+					'taxonomy' => $taxonomy,
+					'termId' => $term_id,
+				]
+			);
+		}
 
 		$current_settings = $this->plugin->get_settings();
 		$data = [

@@ -9,6 +9,108 @@ class Groq_AI_Ajax_Controller {
 
 		add_action( 'wp_ajax_groq_ai_generate_text', [ $this, 'handle_generate_text' ] );
 		add_action( 'wp_ajax_groq_ai_refresh_models', [ $this, 'handle_refresh_models' ] );
+		add_action( 'wp_ajax_groq_ai_generate_term_text', [ $this, 'handle_generate_term_text' ] );
+	}
+
+	public function handle_generate_term_text() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( 'Je hebt geen toestemming voor deze actie.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ], 403 );
+		}
+
+		check_ajax_referer( 'groq_ai_generate_term', 'nonce' );
+
+		$prompt   = isset( $_POST['prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prompt'] ) ) : '';
+		$taxonomy = isset( $_POST['taxonomy'] ) ? sanitize_key( wp_unslash( $_POST['taxonomy'] ) ) : '';
+		$term_id  = isset( $_POST['term_id'] ) ? absint( $_POST['term_id'] ) : 0;
+		$include_top_products = ! empty( $_POST['include_top_products'] );
+		$top_products_limit   = isset( $_POST['top_products_limit'] ) ? absint( $_POST['top_products_limit'] ) : 10;
+		$top_products_limit   = max( 1, min( 25, $top_products_limit ) );
+
+		if ( '' === $prompt || '' === $taxonomy || ! taxonomy_exists( $taxonomy ) || ! $term_id ) {
+			wp_send_json_error( [ 'message' => __( 'Prompt, taxonomy en term_id zijn verplicht.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ], 400 );
+		}
+
+		$term = get_term( $term_id, $taxonomy );
+		if ( ! $term || is_wp_error( $term ) ) {
+			wp_send_json_error( [ 'message' => __( 'Term niet gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ], 404 );
+		}
+
+		$settings         = $this->plugin->get_settings();
+		$provider_manager = $this->plugin->get_provider_manager();
+		$provider_key     = $settings['provider'];
+		$provider         = $provider_manager->get_provider( $provider_key );
+
+		if ( ! $provider ) {
+			$provider     = $provider_manager->get_provider( 'groq' );
+			$provider_key = 'groq';
+		}
+
+		$conversation_id = $this->plugin->get_conversation_manager()->ensure_id( $provider_key, $settings['store_context'] );
+		$prompt_builder  = $this->plugin->get_prompt_builder();
+		$system_prompt   = method_exists( $prompt_builder, 'build_term_system_prompt' )
+			? $prompt_builder->build_term_system_prompt( $settings, $conversation_id, $term )
+			: $prompt_builder->build_system_prompt( $settings, $conversation_id );
+
+		$model = $this->plugin->get_selected_model( $provider, $settings );
+		$context_block = '';
+		if ( method_exists( $prompt_builder, 'build_term_context_block' ) ) {
+			$context_block = $prompt_builder->build_term_context_block(
+				$term,
+				[
+					'include_top_products' => $include_top_products,
+					'top_products_limit' => $top_products_limit,
+				],
+				$settings
+			);
+		}
+		$prompt_with_context = method_exists( $prompt_builder, 'prepend_term_context_to_prompt' )
+			? $prompt_builder->prepend_term_context_to_prompt( $prompt, $context_block )
+			: $prompt_builder->prepend_context_to_prompt( $prompt, $context_block );
+
+		$response_format  = null;
+		$use_response_format = $this->plugin->should_use_response_format( $provider, $settings );
+		if ( $use_response_format && method_exists( $prompt_builder, 'get_term_response_format_definition' ) ) {
+			$response_format = $prompt_builder->get_term_response_format_definition( $settings );
+			$final_prompt    = $prompt_with_context;
+		} elseif ( method_exists( $prompt_builder, 'append_term_response_instructions' ) ) {
+			$final_prompt = $prompt_builder->append_term_response_instructions( $prompt_with_context, $settings );
+		} else {
+			$final_prompt = $prompt_builder->append_response_instructions( $prompt_with_context, $settings );
+		}
+
+		$result = $provider->generate_content(
+			[
+				'prompt'          => $final_prompt,
+				'system_prompt'   => $system_prompt,
+				'model'           => $model,
+				'settings'        => $settings,
+				'temperature'     => 0.7,
+				'conversation_id' => $conversation_id,
+				'response_format' => $response_format,
+			]
+		);
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( [ 'message' => $result->get_error_message() ], 500 );
+		}
+
+		$response_text = $this->extract_content_text( $result );
+		$parsed = null;
+		if ( method_exists( $prompt_builder, 'parse_term_structured_response' ) ) {
+			$parsed = $prompt_builder->parse_term_structured_response( $response_text, $settings );
+		}
+		if ( ! is_array( $parsed ) ) {
+			$parsed = [
+				'description' => trim( (string) $response_text ),
+			];
+		}
+
+		wp_send_json_success(
+			[
+				'description' => isset( $parsed['description'] ) ? $parsed['description'] : '',
+				'raw' => $response_text,
+			]
+		);
 	}
 
 	public function handle_generate_text() {
