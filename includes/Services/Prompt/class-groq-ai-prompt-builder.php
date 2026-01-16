@@ -425,6 +425,7 @@ class Groq_AI_Prompt_Builder {
 		}
 
 		$bottom_meta_key = $this->resolve_term_bottom_description_meta_key( $term, $settings );
+		$bottom_meta_key = '' !== $bottom_meta_key ? $bottom_meta_key : 'groq_ai_term_bottom_description';
 		if ( '' !== $bottom_meta_key && $term_id ) {
 			$bottom = (string) get_term_meta( $term_id, $bottom_meta_key, true );
 			$bottom = trim( wp_strip_all_tags( $bottom ) );
@@ -474,27 +475,18 @@ class Groq_AI_Prompt_Builder {
 		$title_pixels     = $this->settings_manager->get_rankmath_meta_title_pixel_limit( $settings );
 		$desc_pixels      = $this->settings_manager->get_rankmath_meta_description_pixel_limit( $settings );
 
-		$bottom_meta_key = $this->resolve_term_bottom_description_meta_key( null, $settings );
-		$use_bottom_field = ( '' !== $bottom_meta_key );
-
-		$properties = [];
-		$required   = [];
-
-		if ( $use_bottom_field ) {
-			$properties['bottom_description'] = [
+		$properties = [
+			'top_description' => [
 				'type'        => 'string',
-				'description' => __( 'Uitgebreide HTML-omschrijving (helemaal onderaan) met paragrafen en eventueel lijstjes.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'description' => __( 'Korte HTML-omschrijving (1 alinea) voor de standaard WordPress term description. Exact één alinea in <p>-tags.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 				'minLength'   => 20,
-			];
-			$required[] = 'bottom_description';
-		} else {
-			$properties['description'] = [
+			],
+			'bottom_description' => [
 				'type'        => 'string',
-				'description' => __( 'HTML-omschrijving (WordPress term description) met paragrafen en eventueel lijstjes.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'description' => __( 'Uitgebreide HTML-omschrijving (helemaal onderaan), 2–4 alinea’s, met paragrafen en eventueel lijstjes.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 				'minLength'   => 20,
-			];
-			$required[] = 'description';
-		}
+			],
+		];
 
 		if ( $rankmath_enabled ) {
 			$properties['meta_title'] = [
@@ -529,7 +521,7 @@ class Groq_AI_Prompt_Builder {
 		$schema = [
 			'type'                 => 'object',
 			'properties'           => $properties,
-			'required'             => $required,
+			'required'             => [ 'top_description', 'bottom_description' ],
 			'additionalProperties' => false,
 		];
 
@@ -572,36 +564,24 @@ class Groq_AI_Prompt_Builder {
 			];
 		}
 
-		$bottom_meta_key = $this->resolve_term_bottom_description_meta_key( null, $settings );
-		$use_bottom_field = ( '' !== $bottom_meta_key );
-
-		$description = isset( $decoded['description'] ) ? trim( (string) $decoded['description'] ) : '';
 		$top = isset( $decoded['top_description'] ) ? trim( (string) $decoded['top_description'] ) : '';
 		$bottom = isset( $decoded['bottom_description'] ) ? trim( (string) $decoded['bottom_description'] ) : '';
-
-		if ( $use_bottom_field ) {
-			if ( '' === $bottom ) {
-				$bottom = '' !== $description ? $description : $top;
-			}
-			if ( '' === $bottom ) {
-				return new WP_Error( 'groq_ai_parse_error', __( 'De AI-respons bevatte geen bottom_description veld.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
-			}
-		} else {
-			if ( '' === $description ) {
-				$description = '' !== $top ? $top : $bottom;
-			}
-			if ( '' === $description ) {
-				return new WP_Error( 'groq_ai_parse_error', __( 'De AI-respons bevatte geen description veld.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
-			}
+		// Backward compatibility: older prompts only returned `description`.
+		if ( '' === $top && isset( $decoded['description'] ) ) {
+			$top = trim( (string) $decoded['description'] );
+		}
+		if ( '' === $top && '' === $bottom ) {
+			return new WP_Error( 'groq_ai_parse_error', __( 'De AI-respons bevatte geen top_description/bottom_description velden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
 		}
 
 		$result = [];
-		if ( $use_bottom_field ) {
-			$result['bottom_description'] = $bottom;
+		if ( '' !== $top ) {
+			$result['top_description'] = $top;
 			// For backwards compatibility with existing UI, keep `description` alias.
-			$result['description'] = $bottom;
-		} else {
-			$result['description'] = $description;
+			$result['description'] = $top;
+		}
+		if ( '' !== $bottom ) {
+			$result['bottom_description'] = $bottom;
 		}
 
 		if ( isset( $decoded['meta_title'] ) ) {
@@ -628,15 +608,10 @@ class Groq_AI_Prompt_Builder {
 	}
 
 	private function get_term_structured_response_instructions( $settings = null ) {
-		$bottom_meta_key = $this->resolve_term_bottom_description_meta_key( null, $settings );
-		$use_bottom_field = ( '' !== $bottom_meta_key );
-
-		$schema_parts = [];
-		if ( $use_bottom_field ) {
-			$schema_parts[] = '"bottom_description":"..."';
-		} else {
-			$schema_parts[] = '"description":"..."';
-		}
+		$schema_parts = [
+			'"top_description":"..."',
+			'"bottom_description":"..."',
+		];
 
 		$rankmath_enabled = $this->settings_manager->is_module_enabled( 'rankmath', $settings );
 		if ( $rankmath_enabled ) {
@@ -652,13 +627,9 @@ class Groq_AI_Prompt_Builder {
 			$json_structure
 		);
 
-		if ( $use_bottom_field ) {
-			$instruction .= ' ' . __( 'Zorg dat bottom_description geldige HTML bevat. Dit is de tekst die helemaal onderaan de pagina komt.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
-		} else {
-			$instruction .= ' ' . __( 'Zorg dat description geldige HTML bevat.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
-		}
+		$instruction .= ' ' . __( 'Zorg dat top_description en bottom_description geldige HTML bevatten. top_description moet exact één alinea zijn in <p>-tags. bottom_description moet 2–4 alinea’s bevatten.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
 		$instruction .= ' ' . __( 'Voeg geen extra tekst buiten het JSON-object toe.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
-		$instruction .= ' ' . __( 'Als in de context een sectie "Interne links" staat, verwerk dan 2–5 van deze links natuurlijk in de hoofdtekst als HTML-links (<a href="URL">Anker</a>).', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+		$instruction .= ' ' . __( 'Als in de context een sectie "Interne links" staat, verwerk dan 2–5 van deze links natuurlijk in bottom_description als HTML-links (<a href="URL">Anker</a>).', GROQ_AI_PRODUCT_TEXT_DOMAIN );
 		return $instruction;
 	}
 

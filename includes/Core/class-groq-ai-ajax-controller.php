@@ -105,20 +105,14 @@ class Groq_AI_Ajax_Controller {
 			];
 		}
 
-		$default_bottom_key = isset( $settings['term_bottom_description_meta_key'] ) ? sanitize_key( (string) $settings['term_bottom_description_meta_key'] ) : '';
-		$bottom_meta_key    = apply_filters( 'groq_ai_term_bottom_description_meta_key', $default_bottom_key, $term, $settings );
-		$bottom_meta_key    = sanitize_key( (string) $bottom_meta_key );
-		$has_bottom_field   = ( '' !== $bottom_meta_key );
-
-		$top_description = isset( $parsed['description'] ) ? (string) $parsed['description'] : '';
-		$bottom_description = isset( $parsed['bottom_description'] ) ? (string) $parsed['bottom_description'] : '';
-		$apply_text = $has_bottom_field ? ( '' !== $bottom_description ? $bottom_description : $top_description ) : $top_description;
-
 		wp_send_json_success(
 			[
-				'top_description' => $top_description,
-				'bottom_description' => $has_bottom_field ? $apply_text : $bottom_description,
-				'description' => $apply_text,
+				'top_description' => isset( $parsed['top_description'] ) ? $parsed['top_description'] : ( isset( $parsed['description'] ) ? $parsed['description'] : '' ),
+				'bottom_description' => isset( $parsed['bottom_description'] ) ? $parsed['bottom_description'] : '',
+				'meta_title' => isset( $parsed['meta_title'] ) ? $parsed['meta_title'] : '',
+				'meta_description' => isset( $parsed['meta_description'] ) ? $parsed['meta_description'] : '',
+				'focus_keywords' => isset( $parsed['focus_keywords'] ) ? $parsed['focus_keywords'] : '',
+				'description' => isset( $parsed['description'] ) ? $parsed['description'] : ( isset( $parsed['top_description'] ) ? $parsed['top_description'] : '' ),
 				'raw' => $response_text,
 			]
 		);

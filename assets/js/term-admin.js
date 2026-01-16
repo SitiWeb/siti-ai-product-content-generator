@@ -9,7 +9,11 @@
 	}
 
 	const promptField = document.getElementById('groq-ai-term-prompt');
-	const outputField = document.getElementById('groq-ai-term-generated');
+	const outputTopField = document.getElementById('groq-ai-term-generated-top');
+	const outputBottomField = document.getElementById('groq-ai-term-generated-bottom');
+	const outputMetaTitleField = document.getElementById('groq-ai-term-generated-meta-title');
+	const outputMetaDescriptionField = document.getElementById('groq-ai-term-generated-meta-description');
+	const outputFocusKeywordsField = document.getElementById('groq-ai-term-generated-focus-keywords');
 	const rawField = document.getElementById('groq-ai-term-raw');
 	const statusField = document.getElementById('groq-ai-term-status');
 	const applyButton = document.getElementById('groq-ai-term-apply');
@@ -48,14 +52,27 @@
 		applyButton.addEventListener('click', () => {
 			const descriptionField = document.getElementById('description');
 			const bottomDescriptionField = document.getElementById('groq-ai-term-bottom-description');
-			if (!outputField) {
+			const rankmathTitleField = document.getElementById('groq-ai-rankmath-title');
+			const rankmathDescriptionField = document.getElementById('groq-ai-rankmath-description');
+			const rankmathKeywordsField = document.getElementById('groq-ai-rankmath-keywords');
+			if (!outputTopField) {
 				return;
 			}
 
-			if (bottomDescriptionField) {
-				bottomDescriptionField.value = outputField.value || '';
-			} else if (descriptionField) {
-				descriptionField.value = outputField.value || '';
+			if (descriptionField) {
+				descriptionField.value = outputTopField.value || '';
+			}
+			if (bottomDescriptionField && outputBottomField) {
+				bottomDescriptionField.value = outputBottomField.value || '';
+			}
+			if (rankmathTitleField && outputMetaTitleField) {
+				rankmathTitleField.value = outputMetaTitleField.value || '';
+			}
+			if (rankmathDescriptionField && outputMetaDescriptionField) {
+				rankmathDescriptionField.value = outputMetaDescriptionField.value || '';
+			}
+			if (rankmathKeywordsField && outputFocusKeywordsField) {
+				rankmathKeywordsField.value = outputFocusKeywordsField.value || '';
 			}
 
 			setStatus('Tekst ingevuld. Vergeet niet op "Opslaan" te klikken.', 'success');
@@ -76,9 +93,11 @@
 			rawField.textContent = '';
 		}
 
-		if (outputField) {
-			outputField.value = '';
-		}
+		if (outputTopField) outputTopField.value = '';
+		if (outputBottomField) outputBottomField.value = '';
+		if (outputMetaTitleField) outputMetaTitleField.value = '';
+		if (outputMetaDescriptionField) outputMetaDescriptionField.value = '';
+		if (outputFocusKeywordsField) outputFocusKeywordsField.value = '';
 
 		fetch(GroqAITermGenerator.ajaxUrl, {
 			method: 'POST',
@@ -94,9 +113,25 @@
 					throw new Error(errorMessage);
 				}
 
-				if (outputField) {
-					const text = json.data && json.data.description ? json.data.description : '';
-					outputField.value = String(text).trim();
+				if (outputTopField) {
+					const top = json.data && (json.data.top_description || json.data.description) ? (json.data.top_description || json.data.description) : '';
+					outputTopField.value = String(top).trim();
+				}
+				if (outputBottomField) {
+					const bottom = json.data && json.data.bottom_description ? json.data.bottom_description : '';
+					outputBottomField.value = String(bottom).trim();
+				}
+				if (outputMetaTitleField) {
+					const metaTitle = json.data && json.data.meta_title ? json.data.meta_title : '';
+					outputMetaTitleField.value = String(metaTitle).trim();
+				}
+				if (outputMetaDescriptionField) {
+					const metaDescription = json.data && json.data.meta_description ? json.data.meta_description : '';
+					outputMetaDescriptionField.value = String(metaDescription).trim();
+				}
+				if (outputFocusKeywordsField) {
+					const keywords = json.data && json.data.focus_keywords ? json.data.focus_keywords : '';
+					outputFocusKeywordsField.value = String(keywords).trim();
 				}
 				if (rawField) {
 					rawField.textContent = (json.data && json.data.raw ? String(json.data.raw) : '').trim();
