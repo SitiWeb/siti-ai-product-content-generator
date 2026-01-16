@@ -144,6 +144,15 @@ class Groq_AI_Provider_Google implements Groq_AI_Provider_Interface {
 			];
 		}
 
+		$max_tokens = isset( $args['max_tokens'] ) ? absint( $args['max_tokens'] ) : 0;
+		if ( $max_tokens <= 0 ) {
+			$max_tokens = isset( $settings['max_output_tokens'] ) ? absint( $settings['max_output_tokens'] ) : 0;
+		}
+		if ( $max_tokens <= 0 ) {
+			$max_tokens = 2048;
+		}
+		$max_tokens = max( 128, min( 8192, $max_tokens ) );
+
 		$payload = [
 			'contents'         => [
 				[
@@ -153,7 +162,7 @@ class Groq_AI_Provider_Google implements Groq_AI_Provider_Interface {
 			],
 			'generationConfig' => [
 				'temperature'     => isset( $args['temperature'] ) ? (float) $args['temperature'] : 0.7,
-				'maxOutputTokens' => 1024,
+				'maxOutputTokens' => $max_tokens,
 			],
 		];
 
@@ -196,6 +205,10 @@ class Groq_AI_Provider_Google implements Groq_AI_Provider_Interface {
 
 		$content = trim( implode( "\n\n", array_filter( $texts ) ) );
 		$usage   = isset( $body['usageMetadata'] ) && is_array( $body['usageMetadata'] ) ? $body['usageMetadata'] : [];
+		$finish_reason = isset( $body['candidates'][0]['finishReason'] ) ? sanitize_text_field( (string) $body['candidates'][0]['finishReason'] ) : '';
+		if ( '' !== $finish_reason ) {
+			$usage['finish_reason'] = $finish_reason;
+		}
 
 		return [
 			'content'      => $content,

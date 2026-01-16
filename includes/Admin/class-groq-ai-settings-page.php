@@ -543,6 +543,14 @@ class Groq_AI_Product_Text_Settings_Page {
 		);
 
 		add_settings_field(
+			'groq_ai_max_output_tokens',
+			__( 'Max output tokens', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			[ $this, 'render_max_output_tokens_field' ],
+			'groq-ai-product-text-prompts',
+			'groq_ai_product_text_prompts'
+		);
+
+		add_settings_field(
 			'groq_ai_context_fields',
 			__( 'Standaard productcontext', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			[ $this, 'render_context_fields_field' ],
@@ -1452,6 +1460,25 @@ class Groq_AI_Product_Text_Settings_Page {
 		?>
 		<textarea name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[default_prompt]" class="large-text" rows="4" placeholder="<?php esc_attr_e( 'Bijvoorbeeld: Schrijf een overtuigende productbeschrijving met nadruk op kwaliteit en levertijd.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>"><?php echo esc_textarea( $settings['default_prompt'] ); ?></textarea>
 		<p class="description"><?php esc_html_e( 'Deze tekst verschijnt vooraf ingevuld in de AI-popup, maar kan per product worden aangepast.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+		<?php
+	}
+
+	public function render_max_output_tokens_field() {
+		$settings = $this->plugin->get_settings();
+		$value    = isset( $settings['max_output_tokens'] ) ? absint( $settings['max_output_tokens'] ) : 2048;
+		$value    = max( 128, min( 8192, $value ) );
+		?>
+		<input type="number"
+			name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[max_output_tokens]"
+			min="128"
+			max="8192"
+			step="128"
+			value="<?php echo esc_attr( (string) $value ); ?>"
+			class="small-text"
+		/>
+		<p class="description">
+			<?php esc_html_e( 'Limiet voor lengte van het AI-antwoord. Als teksten afgekapt worden, zet dit hoger (kost vaak wel meer tokens).', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+		</p>
 		<?php
 	}
 

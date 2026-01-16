@@ -80,11 +80,20 @@ abstract class Groq_AI_Abstract_OpenAI_Provider implements Groq_AI_Provider_Inte
 			],
 		];
 
+		$max_tokens = isset( $args['max_tokens'] ) ? absint( $args['max_tokens'] ) : 0;
+		if ( $max_tokens <= 0 ) {
+			$max_tokens = isset( $settings['max_output_tokens'] ) ? absint( $settings['max_output_tokens'] ) : 0;
+		}
+		if ( $max_tokens <= 0 ) {
+			$max_tokens = 2048;
+		}
+		$max_tokens = max( 128, min( 8192, $max_tokens ) );
+
 		$request_body = [
 			'model'       => $model,
 			'messages'    => $messages,
 			'temperature' => isset( $args['temperature'] ) ? (float) $args['temperature'] : 0.7,
-			'max_tokens'  => 1024,
+			'max_tokens'  => $max_tokens,
 		];
 
 		if ( ! empty( $args['response_format'] ) ) {
@@ -122,6 +131,10 @@ abstract class Groq_AI_Abstract_OpenAI_Provider implements Groq_AI_Provider_Inte
 
 		$content = trim( $body['choices'][0]['message']['content'] );
 		$usage   = isset( $body['usage'] ) && is_array( $body['usage'] ) ? $body['usage'] : [];
+		$finish_reason = isset( $body['choices'][0]['finish_reason'] ) ? sanitize_text_field( (string) $body['choices'][0]['finish_reason'] ) : '';
+		if ( '' !== $finish_reason ) {
+			$usage['finish_reason'] = $finish_reason;
+		}
 
 		return [
 			'content'      => $content,

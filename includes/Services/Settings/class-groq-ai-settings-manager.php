@@ -32,6 +32,7 @@ class Groq_AI_Settings_Manager {
 			'model'          => '',
 			'store_context'  => '',
 			'default_prompt' => '',
+			'max_output_tokens' => 2048,
 			'groq_api_key'   => '',
 			'openai_api_key' => '',
 			'google_api_key' => '',
@@ -87,6 +88,7 @@ class Groq_AI_Settings_Manager {
 			'model'          => '',
 			'store_context'  => '',
 			'default_prompt' => '',
+			'max_output_tokens' => 2048,
 			'groq_api_key'   => '',
 			'openai_api_key' => '',
 			'google_api_key' => '',
@@ -129,6 +131,10 @@ class Groq_AI_Settings_Manager {
 
 		$image_limit = isset( $input['image_context_limit'] ) ? $this->sanitize_image_context_limit_value( $input['image_context_limit'] ) : $defaults['image_context_limit'];
 
+		$max_output_tokens = isset( $input['max_output_tokens'] ) ? absint( $input['max_output_tokens'] ) : absint( $defaults['max_output_tokens'] );
+		// Keep within sane bounds across providers.
+		$max_output_tokens = max( 128, min( 8192, $max_output_tokens ) );
+
 		$context_fields = $this->normalize_context_fields( $context_posted ? $raw_input['context_fields'] : $defaults['context_fields'] );
 
 		if ( 'none' === $image_mode ) {
@@ -142,6 +148,7 @@ class Groq_AI_Settings_Manager {
 			'model'          => $model,
 			'store_context'  => sanitize_textarea_field( $input['store_context'] ),
 			'default_prompt' => sanitize_textarea_field( $input['default_prompt'] ),
+			'max_output_tokens' => $max_output_tokens,
 			'groq_api_key'   => sanitize_text_field( $input['groq_api_key'] ),
 			'openai_api_key' => sanitize_text_field( $input['openai_api_key'] ),
 			'google_api_key' => sanitize_text_field( $input['google_api_key'] ),
