@@ -319,6 +319,12 @@ class Groq_AI_Product_Text_Settings_Page {
 		$term_label = ( 'product_cat' === $taxonomy ) ? __( 'Categorie', GROQ_AI_PRODUCT_TEXT_DOMAIN ) : __( 'Term', GROQ_AI_PRODUCT_TEXT_DOMAIN );
 		$word_count = $this->count_words( $term->description );
 		$meta_prompt = get_term_meta( $term_id, 'groq_ai_term_custom_prompt', true );
+		$settings = $this->plugin->get_settings();
+		$bottom_meta_key = $this->resolve_term_bottom_description_meta_key( $term, $settings );
+		$bottom_description = '';
+		if ( '' !== $bottom_meta_key ) {
+			$bottom_description = (string) get_term_meta( $term_id, $bottom_meta_key, true );
+		}
 		$default_prompt = (string) $meta_prompt;
 		if ( '' === trim( $default_prompt ) ) {
 			$default_prompt = __( 'Schrijf een SEO-vriendelijke categorieomschrijving in het Nederlands. Gebruik duidelijke tussenkoppen en <p>-tags. Voeg geen prijsinformatie toe.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
@@ -354,6 +360,23 @@ class Groq_AI_Product_Text_Settings_Page {
 							<p class="description"><?php esc_html_e( 'Dit is de standaard WordPress term-omschrijving (wordt o.a. gebruikt op categorie/merk pagina’s).', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
 						</td>
 					</tr>
+					<?php if ( '' !== $bottom_meta_key ) : ?>
+						<tr>
+							<th scope="row"><label for="groq-ai-term-bottom-description"><?php esc_html_e( 'Omschrijving (onderaan)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
+							<td>
+								<textarea name="groq_ai_term_bottom_description" id="groq-ai-term-bottom-description" rows="8" class="large-text"><?php echo esc_textarea( (string) $bottom_description ); ?></textarea>
+								<p class="description">
+									<?php
+										printf(
+											/* translators: %s: meta key */
+											esc_html__( 'Dit veld wordt opgeslagen in term meta (%s) en wordt onderaan de pagina getoond via LiveBetter customfields.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+											esc_html( $bottom_meta_key )
+										);
+									?>
+								</p>
+							</td>
+						</tr>
+					<?php endif; ?>
 					<tr>
 						<th scope="row"><label for="groq-ai-term-custom-prompt"><?php esc_html_e( 'Prompt (optioneel, per term)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
 						<td>
@@ -384,16 +407,35 @@ class Groq_AI_Product_Text_Settings_Page {
 				<textarea id="groq-ai-term-prompt" class="large-text" rows="5"><?php echo esc_textarea( $default_prompt ); ?></textarea>
 				<p>
 					<button type="submit" class="button button-primary"><?php esc_html_e( 'Genereer', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
-					<button type="button" class="button" id="groq-ai-term-apply"><?php esc_html_e( 'Zet in omschrijving', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
+					<button type="button" class="button" id="groq-ai-term-apply">
+						<?php
+							if ( '' !== $bottom_meta_key ) {
+								esc_html_e( 'Zet in onderaan-veld', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+							} else {
+								esc_html_e( 'Zet in omschrijving', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+							}
+						?>
+					</button>
 				</p>
 				<div id="groq-ai-term-status" class="description" aria-live="polite"></div>
-				<h3><?php esc_html_e( 'Gegenereerde tekst', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h3>
+				<h3><?php esc_html_e( 'Gegenereerde tekst (onderaan)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h3>
 				<textarea id="groq-ai-term-generated" class="large-text" rows="10"></textarea>
 				<h3><?php esc_html_e( 'Ruwe JSON-output', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h3>
 				<pre id="groq-ai-term-raw" style="background:#fff;border:1px solid #ddd;padding:12px;max-height:240px;overflow:auto;"></pre>
 			</form>
 		</div>
 		<?php
+	}
+
+	private function resolve_term_bottom_description_meta_key( $term, $settings ) {
+		$default_key = '';
+		if ( is_array( $settings ) && isset( $settings['term_bottom_description_meta_key'] ) ) {
+			$default_key = sanitize_key( (string) $settings['term_bottom_description_meta_key'] );
+		}
+
+		$key = apply_filters( 'groq_ai_term_bottom_description_meta_key', $default_key, $term, $settings );
+		$key = sanitize_key( (string) $key );
+		return $key;
 	}
 
 	public function handle_save_term_content() {
@@ -406,6 +448,7 @@ class Groq_AI_Product_Text_Settings_Page {
 		$taxonomy = isset( $_POST['taxonomy'] ) ? sanitize_key( wp_unslash( $_POST['taxonomy'] ) ) : '';
 		$term_id  = isset( $_POST['term_id'] ) ? absint( $_POST['term_id'] ) : 0;
 		$description = isset( $_POST['description'] ) ? wp_kses_post( wp_unslash( $_POST['description'] ) ) : '';
+		$bottom_description = isset( $_POST['groq_ai_term_bottom_description'] ) ? wp_kses_post( wp_unslash( $_POST['groq_ai_term_bottom_description'] ) ) : '';
 		$custom_prompt = isset( $_POST['groq_ai_term_custom_prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['groq_ai_term_custom_prompt'] ) ) : '';
 
 		if ( '' === $taxonomy || ! taxonomy_exists( $taxonomy ) || ! $term_id ) {
@@ -423,6 +466,14 @@ class Groq_AI_Product_Text_Settings_Page {
 
 		if ( ! is_wp_error( $result ) ) {
 			update_term_meta( $term_id, 'groq_ai_term_custom_prompt', $custom_prompt );
+			$settings = $this->plugin->get_settings();
+			$term = get_term( $term_id, $taxonomy );
+			if ( $term && ! is_wp_error( $term ) ) {
+				$bottom_meta_key = $this->resolve_term_bottom_description_meta_key( $term, $settings );
+				if ( '' !== $bottom_meta_key ) {
+					update_term_meta( $term_id, $bottom_meta_key, $bottom_description );
+				}
+			}
 		}
 
 		wp_safe_redirect( $this->get_term_page_url( $taxonomy, $term_id ) );
@@ -550,6 +601,14 @@ class Groq_AI_Product_Text_Settings_Page {
 			'groq_ai_max_output_tokens',
 			__( 'Max output tokens', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			[ $this, 'render_max_output_tokens_field' ],
+			'groq-ai-product-text-prompts',
+			'groq_ai_product_text_prompts'
+		);
+
+		add_settings_field(
+			'groq_ai_term_bottom_description_meta_key',
+			__( 'Term-veld (onderaan) meta key', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			[ $this, 'render_term_bottom_description_meta_key_field' ],
 			'groq-ai-product-text-prompts',
 			'groq_ai_product_text_prompts'
 		);
@@ -1486,6 +1545,22 @@ class Groq_AI_Product_Text_Settings_Page {
 		<?php
 	}
 
+	public function render_term_bottom_description_meta_key_field() {
+		$settings = $this->plugin->get_settings();
+		$value    = isset( $settings['term_bottom_description_meta_key'] ) ? (string) $settings['term_bottom_description_meta_key'] : '';
+		?>
+		<input type="text"
+			name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[term_bottom_description_meta_key]"
+			value="<?php echo esc_attr( $value ); ?>"
+			class="regular-text"
+			placeholder="bijv. bottom_description"
+		/>
+		<p class="description">
+			<?php esc_html_e( 'Dit is de term meta key van het extra customfields-veld dat onderaan de categorie/merk pagina wordt getoond (LiveBetter customfields). Laat leeg om alleen de standaard term-omschrijving te gebruiken.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+		</p>
+		<?php
+	}
+
 	public function render_context_fields_field() {
 		$settings    = $this->plugin->get_settings();
 		$values      = isset( $settings['context_fields'] ) ? $settings['context_fields'] : $this->plugin->get_default_context_fields();
@@ -1560,7 +1635,7 @@ class Groq_AI_Product_Text_Settings_Page {
 				type="number"
 				id="groq-ai-rankmath-keywords"
 				min="1"
-				max="99"
+				max="100"
 				name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[modules][rankmath][focus_keyword_limit]"
 				value="<?php echo esc_attr( $keyword_limit ); ?>"
 				style="width: 80px;"

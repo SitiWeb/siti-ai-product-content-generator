@@ -47,11 +47,18 @@
 	if (applyButton) {
 		applyButton.addEventListener('click', () => {
 			const descriptionField = document.getElementById('description');
-			if (!descriptionField || !outputField) {
+			const bottomDescriptionField = document.getElementById('groq-ai-term-bottom-description');
+			if (!outputField) {
 				return;
 			}
-			descriptionField.value = outputField.value || '';
-			setStatus('Tekst ingevuld in het beschrijving-veld. Vergeet niet op "Opslaan" te klikken.', 'success');
+
+			if (bottomDescriptionField) {
+				bottomDescriptionField.value = outputField.value || '';
+			} else if (descriptionField) {
+				descriptionField.value = outputField.value || '';
+			}
+
+			setStatus('Tekst ingevuld. Vergeet niet op "Opslaan" te klikken.', 'success');
 		});
 	}
 
@@ -69,6 +76,10 @@
 			rawField.textContent = '';
 		}
 
+		if (outputField) {
+			outputField.value = '';
+		}
+
 		fetch(GroqAITermGenerator.ajaxUrl, {
 			method: 'POST',
 			headers: {
@@ -84,7 +95,8 @@
 				}
 
 				if (outputField) {
-					outputField.value = (json.data && json.data.description ? json.data.description : '').trim();
+					const text = json.data && json.data.description ? json.data.description : '';
+					outputField.value = String(text).trim();
 				}
 				if (rawField) {
 					rawField.textContent = (json.data && json.data.raw ? String(json.data.raw) : '').trim();

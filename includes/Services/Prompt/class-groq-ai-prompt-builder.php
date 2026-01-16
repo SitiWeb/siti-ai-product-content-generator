@@ -424,6 +424,15 @@ class Groq_AI_Prompt_Builder {
 			$parts[] = sprintf( __( 'Huidige omschrijving: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), wp_strip_all_tags( (string) $term->description ) );
 		}
 
+		$bottom_meta_key = $this->resolve_term_bottom_description_meta_key( $term, $settings );
+		if ( '' !== $bottom_meta_key && $term_id ) {
+			$bottom = (string) get_term_meta( $term_id, $bottom_meta_key, true );
+			$bottom = trim( wp_strip_all_tags( $bottom ) );
+			if ( '' !== $bottom ) {
+				$parts[] = sprintf( __( 'Huidige omschrijving (onderaan): %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $bottom );
+			}
+		}
+
 		if ( $include_top_products ) {
 			$top_products = $this->get_top_products_for_term( $taxonomy, $term_id, $top_products_limit );
 			if ( ! empty( $top_products ) ) {
@@ -465,13 +474,27 @@ class Groq_AI_Prompt_Builder {
 		$title_pixels     = $this->settings_manager->get_rankmath_meta_title_pixel_limit( $settings );
 		$desc_pixels      = $this->settings_manager->get_rankmath_meta_description_pixel_limit( $settings );
 
-		$properties = [
-			'description' => [
+		$bottom_meta_key = $this->resolve_term_bottom_description_meta_key( null, $settings );
+		$use_bottom_field = ( '' !== $bottom_meta_key );
+
+		$properties = [];
+		$required   = [];
+
+		if ( $use_bottom_field ) {
+			$properties['bottom_description'] = [
 				'type'        => 'string',
-				'description' => __( 'HTML-omschrijving voor de categorie/term met paragrafen en eventueel lijstjes.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'description' => __( 'Uitgebreide HTML-omschrijving (helemaal onderaan) met paragrafen en eventueel lijstjes.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 				'minLength'   => 20,
-			],
-		];
+			];
+			$required[] = 'bottom_description';
+		} else {
+			$properties['description'] = [
+				'type'        => 'string',
+				'description' => __( 'HTML-omschrijving (WordPress term description) met paragrafen en eventueel lijstjes.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'minLength'   => 20,
+			];
+			$required[] = 'description';
+		}
 
 		if ( $rankmath_enabled ) {
 			$properties['meta_title'] = [
@@ -506,7 +529,7 @@ class Groq_AI_Prompt_Builder {
 		$schema = [
 			'type'                 => 'object',
 			'properties'           => $properties,
-			'required'             => [ 'description' ],
+			'required'             => $required,
 			'additionalProperties' => false,
 		];
 
@@ -549,14 +572,37 @@ class Groq_AI_Prompt_Builder {
 			];
 		}
 
+		$bottom_meta_key = $this->resolve_term_bottom_description_meta_key( null, $settings );
+		$use_bottom_field = ( '' !== $bottom_meta_key );
+
 		$description = isset( $decoded['description'] ) ? trim( (string) $decoded['description'] ) : '';
-		if ( '' === $description ) {
-			return new WP_Error( 'groq_ai_parse_error', __( 'De AI-respons bevatte geen description veld.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
+		$top = isset( $decoded['top_description'] ) ? trim( (string) $decoded['top_description'] ) : '';
+		$bottom = isset( $decoded['bottom_description'] ) ? trim( (string) $decoded['bottom_description'] ) : '';
+
+		if ( $use_bottom_field ) {
+			if ( '' === $bottom ) {
+				$bottom = '' !== $description ? $description : $top;
+			}
+			if ( '' === $bottom ) {
+				return new WP_Error( 'groq_ai_parse_error', __( 'De AI-respons bevatte geen bottom_description veld.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
+			}
+		} else {
+			if ( '' === $description ) {
+				$description = '' !== $top ? $top : $bottom;
+			}
+			if ( '' === $description ) {
+				return new WP_Error( 'groq_ai_parse_error', __( 'De AI-respons bevatte geen description veld.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
+			}
 		}
 
-		$result = [
-			'description' => $description,
-		];
+		$result = [];
+		if ( $use_bottom_field ) {
+			$result['bottom_description'] = $bottom;
+			// For backwards compatibility with existing UI, keep `description` alias.
+			$result['description'] = $bottom;
+		} else {
+			$result['description'] = $description;
+		}
 
 		if ( isset( $decoded['meta_title'] ) ) {
 			$result['meta_title'] = $this->truncate_meta_field( (string) $decoded['meta_title'], 60 );
@@ -582,9 +628,15 @@ class Groq_AI_Prompt_Builder {
 	}
 
 	private function get_term_structured_response_instructions( $settings = null ) {
-		$schema_parts = [
-			'"description":"..."',
-		];
+		$bottom_meta_key = $this->resolve_term_bottom_description_meta_key( null, $settings );
+		$use_bottom_field = ( '' !== $bottom_meta_key );
+
+		$schema_parts = [];
+		if ( $use_bottom_field ) {
+			$schema_parts[] = '"bottom_description":"..."';
+		} else {
+			$schema_parts[] = '"description":"..."';
+		}
 
 		$rankmath_enabled = $this->settings_manager->is_module_enabled( 'rankmath', $settings );
 		if ( $rankmath_enabled ) {
@@ -600,9 +652,23 @@ class Groq_AI_Prompt_Builder {
 			$json_structure
 		);
 
-		$instruction .= ' ' . __( 'Zorg dat description geldige HTML bevat (gebruik minimaal <p>-tags en waar relevant lijstjes of benadrukking). Voeg geen extra tekst buiten het JSON-object toe.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
-		$instruction .= ' ' . __( 'Als in de context een sectie "Interne links" staat, verwerk dan 2–5 van deze links natuurlijk in de description als HTML-links (<a href="URL">Anker</a>).', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+		if ( $use_bottom_field ) {
+			$instruction .= ' ' . __( 'Zorg dat bottom_description geldige HTML bevat. Dit is de tekst die helemaal onderaan de pagina komt.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+		} else {
+			$instruction .= ' ' . __( 'Zorg dat description geldige HTML bevat.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+		}
+		$instruction .= ' ' . __( 'Voeg geen extra tekst buiten het JSON-object toe.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+		$instruction .= ' ' . __( 'Als in de context een sectie "Interne links" staat, verwerk dan 2–5 van deze links natuurlijk in de hoofdtekst als HTML-links (<a href="URL">Anker</a>).', GROQ_AI_PRODUCT_TEXT_DOMAIN );
 		return $instruction;
+	}
+
+	private function resolve_term_bottom_description_meta_key( $term = null, $settings = null ) {
+		$default_key = '';
+		if ( is_array( $settings ) && isset( $settings['term_bottom_description_meta_key'] ) ) {
+			$default_key = sanitize_key( (string) $settings['term_bottom_description_meta_key'] );
+		}
+		$key = apply_filters( 'groq_ai_term_bottom_description_meta_key', $default_key, $term, $settings );
+		return sanitize_key( (string) $key );
 	}
 
 	private function get_top_products_for_term( $taxonomy, $term_id, $limit = 10 ) {

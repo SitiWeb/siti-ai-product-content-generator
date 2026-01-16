@@ -33,6 +33,7 @@ class Groq_AI_Settings_Manager {
 			'store_context'  => '',
 			'default_prompt' => '',
 			'max_output_tokens' => 2048,
+			'term_bottom_description_meta_key' => '',
 			'groq_api_key'   => '',
 			'openai_api_key' => '',
 			'google_api_key' => '',
@@ -89,6 +90,7 @@ class Groq_AI_Settings_Manager {
 			'store_context'  => '',
 			'default_prompt' => '',
 			'max_output_tokens' => 2048,
+			'term_bottom_description_meta_key' => '',
 			'groq_api_key'   => '',
 			'openai_api_key' => '',
 			'google_api_key' => '',
@@ -149,6 +151,7 @@ class Groq_AI_Settings_Manager {
 			'store_context'  => sanitize_textarea_field( $input['store_context'] ),
 			'default_prompt' => sanitize_textarea_field( $input['default_prompt'] ),
 			'max_output_tokens' => $max_output_tokens,
+			'term_bottom_description_meta_key' => sanitize_key( (string) $input['term_bottom_description_meta_key'] ),
 			'groq_api_key'   => sanitize_text_field( $input['groq_api_key'] ),
 			'openai_api_key' => sanitize_text_field( $input['openai_api_key'] ),
 			'google_api_key' => sanitize_text_field( $input['google_api_key'] ),
@@ -282,7 +285,7 @@ class Groq_AI_Settings_Manager {
 		$config = $this->get_module_config( 'rankmath', $settings );
 		$limit  = isset( $config['focus_keyword_limit'] ) ? absint( $config['focus_keyword_limit'] ) : 3;
 
-		return max( 1, min( 10, $limit ) );
+		return max( 1, min( 100, $limit ) );
 	}
 
 	public function get_rankmath_meta_title_pixel_limit( $settings = null ) {
@@ -375,7 +378,7 @@ class Groq_AI_Settings_Manager {
 				if ( $limit <= 0 ) {
 					$limit = $module_default_config['focus_keyword_limit'];
 				}
-				$result[ $module_key ]['focus_keyword_limit'] = max( 1, min( 10, $limit ) );
+				$result[ $module_key ]['focus_keyword_limit'] = max( 1, min( 100, $limit ) );
 
 				$title_pixel_limit = isset( $raw['meta_title_pixel_limit'] ) ? absint( $raw['meta_title_pixel_limit'] ) : ( isset( $current_config['meta_title_pixel_limit'] ) ? absint( $current_config['meta_title_pixel_limit'] ) : $module_default_config['meta_title_pixel_limit'] );
 				if ( $title_pixel_limit <= 0 ) {

@@ -105,9 +105,20 @@ class Groq_AI_Ajax_Controller {
 			];
 		}
 
+		$default_bottom_key = isset( $settings['term_bottom_description_meta_key'] ) ? sanitize_key( (string) $settings['term_bottom_description_meta_key'] ) : '';
+		$bottom_meta_key    = apply_filters( 'groq_ai_term_bottom_description_meta_key', $default_bottom_key, $term, $settings );
+		$bottom_meta_key    = sanitize_key( (string) $bottom_meta_key );
+		$has_bottom_field   = ( '' !== $bottom_meta_key );
+
+		$top_description = isset( $parsed['description'] ) ? (string) $parsed['description'] : '';
+		$bottom_description = isset( $parsed['bottom_description'] ) ? (string) $parsed['bottom_description'] : '';
+		$apply_text = $has_bottom_field ? ( '' !== $bottom_description ? $bottom_description : $top_description ) : $top_description;
+
 		wp_send_json_success(
 			[
-				'description' => isset( $parsed['description'] ) ? $parsed['description'] : '',
+				'top_description' => $top_description,
+				'bottom_description' => $has_bottom_field ? $apply_text : $bottom_description,
+				'description' => $apply_text,
 				'raw' => $response_text,
 			]
 		);
