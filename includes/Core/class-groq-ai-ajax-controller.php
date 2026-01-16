@@ -143,6 +143,23 @@ class Groq_AI_Ajax_Controller {
 		$system_prompt        = $prompt_builder->build_system_prompt( $settings, $conversation_id );
 		$model                = $this->plugin->get_selected_model( $provider, $settings );
 		$context_fields       = $prompt_builder->parse_context_fields_from_request( isset( $_POST['context_fields'] ) ? $_POST['context_fields'] : '', $settings );
+		if ( array_key_exists( 'attribute_includes', $_POST ) ) {
+			$attribute_includes = [];
+			$attribute_raw      = (string) wp_unslash( $_POST['attribute_includes'] );
+			$decoded            = json_decode( $attribute_raw, true );
+			if ( is_array( $decoded ) ) {
+				foreach ( $decoded as $value ) {
+					$key = sanitize_key( (string) $value );
+					if ( '' === $key ) {
+						continue;
+					}
+					if ( in_array( $key, [ '__custom__', '__all__' ], true ) || 0 === strpos( $key, 'pa_' ) ) {
+						$attribute_includes[] = $key;
+					}
+				}
+			}
+			$settings['product_attribute_includes'] = array_values( array_unique( $attribute_includes ) );
+		}
 		$image_context_mode   = $this->plugin->get_image_context_mode( $settings );
 		$image_context_limit  = $this->plugin->get_image_context_limit( $settings );
 
@@ -168,7 +185,7 @@ class Groq_AI_Ajax_Controller {
 			}
 		}
 
-		$product_context_text = $prompt_builder->build_product_context_block( $post_id, $context_fields, $prompt_image_mode, $image_context_limit );
+		$product_context_text = $prompt_builder->build_product_context_block( $post_id, $context_fields, $prompt_image_mode, $image_context_limit, $settings );
 		$image_context_payloads = [];
 		if ( $use_base64_payloads ) {
 			$image_context_payloads = $prompt_builder->get_product_image_payloads( $post_id, $image_context_limit );

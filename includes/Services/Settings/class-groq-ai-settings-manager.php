@@ -33,6 +33,7 @@ class Groq_AI_Settings_Manager {
 			'store_context'  => '',
 			'default_prompt' => '',
 			'max_output_tokens' => 2048,
+			'product_attribute_includes' => [],
 			'term_bottom_description_meta_key' => '',
 			'groq_api_key'   => '',
 			'openai_api_key' => '',
@@ -74,6 +75,10 @@ class Groq_AI_Settings_Manager {
 		$limit = isset( $settings['image_context_limit'] ) ? $this->sanitize_image_context_limit_value( $settings['image_context_limit'] ) : 3;
 		$settings['image_context_limit'] = $limit;
 
+		$settings['product_attribute_includes'] = $this->sanitize_product_attribute_includes(
+			isset( $settings['product_attribute_includes'] ) ? $settings['product_attribute_includes'] : []
+		);
+
 		return $settings;
 	}
 
@@ -90,6 +95,7 @@ class Groq_AI_Settings_Manager {
 			'store_context'  => '',
 			'default_prompt' => '',
 			'max_output_tokens' => 2048,
+			'product_attribute_includes' => [],
 			'term_bottom_description_meta_key' => '',
 			'groq_api_key'   => '',
 			'openai_api_key' => '',
@@ -151,6 +157,7 @@ class Groq_AI_Settings_Manager {
 			'store_context'  => sanitize_textarea_field( $input['store_context'] ),
 			'default_prompt' => sanitize_textarea_field( $input['default_prompt'] ),
 			'max_output_tokens' => $max_output_tokens,
+			'product_attribute_includes' => $this->sanitize_product_attribute_includes( isset( $raw_input['product_attribute_includes'] ) ? $raw_input['product_attribute_includes'] : [] ),
 			'term_bottom_description_meta_key' => sanitize_key( (string) $input['term_bottom_description_meta_key'] ),
 			'groq_api_key'   => sanitize_text_field( $input['groq_api_key'] ),
 			'openai_api_key' => sanitize_text_field( $input['openai_api_key'] ),
@@ -175,6 +182,33 @@ class Groq_AI_Settings_Manager {
 				$modules_posted
 			),
 		];
+	}
+
+	private function sanitize_product_attribute_includes( $value ) {
+		if ( ! is_array( $value ) ) {
+			return [];
+		}
+
+		$clean = [];
+		foreach ( $value as $item ) {
+			$item = sanitize_key( (string) $item );
+			if ( '' === $item ) {
+				continue;
+			}
+
+			// Allow special tokens and attribute taxonomies.
+			if ( in_array( $item, [ '__all__', '__custom__' ], true ) || 0 === strpos( $item, 'pa_' ) ) {
+				$clean[] = $item;
+			}
+		}
+
+		$clean = array_values( array_unique( $clean ) );
+		// Hard cap to avoid overly large option payloads.
+		if ( count( $clean ) > 200 ) {
+			$clean = array_slice( $clean, 0, 200 );
+		}
+
+		return $clean;
 	}
 
 	public function get_context_field_definitions() {

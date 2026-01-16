@@ -59,6 +59,9 @@ class Groq_AI_Product_Text_Product_UI {
 			$post_id = ( $post && isset( $post->ID ) ) ? (int) $post->ID : 0;
 
 			$settings = $this->plugin->get_settings();
+			$attribute_defaults = isset( $settings['product_attribute_includes'] ) && is_array( $settings['product_attribute_includes'] )
+				? array_values( array_unique( array_map( 'sanitize_key', $settings['product_attribute_includes'] ) ) )
+				: [];
 
 			wp_localize_script(
 				'groq-ai-admin',
@@ -69,6 +72,7 @@ class Groq_AI_Product_Text_Product_UI {
 					'defaultPrompt' => $settings['default_prompt'],
 					'postId'        => $post_id,
 					'contextDefaults' => isset( $settings['context_fields'] ) ? $settings['context_fields'] : $this->plugin->get_default_context_fields(),
+					'attributeIncludesDefaults' => $attribute_defaults,
 				]
 			);
 		}
@@ -82,6 +86,7 @@ class Groq_AI_Product_Text_Product_UI {
 
 		$settings          = $this->plugin->get_settings();
 		$rankmath_enabled  = $this->plugin->is_rankmath_active() && $this->plugin->is_module_enabled( 'rankmath', $settings );
+		$attribute_options = $this->get_product_attribute_include_options();
 		?>
 		<div id="groq-ai-modal" class="groq-ai-modal" aria-hidden="true">
 			<div class="groq-ai-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="groq-ai-modal-title">
@@ -109,6 +114,9 @@ class Groq_AI_Product_Text_Product_UI {
 								$context_definitions = $this->plugin->get_context_field_definitions();
 								$context_defaults    = isset( $settings['context_fields'] ) ? $settings['context_fields'] : $this->plugin->get_default_context_fields();
 								foreach ( $context_definitions as $context_key => $context_info ) :
+									if ( 'attributes' === $context_key ) {
+										continue;
+									}
 									$checked = ! empty( $context_defaults[ $context_key ] );
 									?>
 									<label class="groq-ai-context-option">
@@ -122,6 +130,23 @@ class Groq_AI_Product_Text_Product_UI {
 									</label>
 								<?php endforeach; ?>
 							</div>
+
+							<h3 style="margin-top:16px;"><?php esc_html_e( 'Attributen meesturen', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h3>
+							<p class="description"><?php esc_html_e( 'Selecteer welke productattributen je mee wilt geven aan de AI. Dit vervangt de oude alles-of-niets optie.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+							<?php if ( empty( $attribute_options ) ) : ?>
+								<p class="description"><?php esc_html_e( 'Geen WooCommerce-attributen gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+							<?php else : ?>
+								<div class="groq-ai-context-options__grid">
+									<?php foreach ( $attribute_options as $attr_key => $attr_label ) : ?>
+										<label class="groq-ai-context-option">
+											<input type="checkbox" class="groq-ai-attribute-toggle" data-attribute="<?php echo esc_attr( $attr_key ); ?>" />
+											<div>
+												<strong><?php echo esc_html( $attr_label ); ?></strong>
+											</div>
+										</label>
+									<?php endforeach; ?>
+								</div>
+							<?php endif; ?>
 						</div>
 					</div>
 					</form>
@@ -224,5 +249,40 @@ class Groq_AI_Product_Text_Product_UI {
 			</div>
 		</div>
 		<?php
+	}
+
+	private function get_product_attribute_include_options() {
+		$options = [
+			'__custom__' => __( 'Custom attributen (niet-taxonomie)', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+		];
+
+		if ( function_exists( 'wc_get_attribute_taxonomies' ) ) {
+			$taxonomies = wc_get_attribute_taxonomies();
+			if ( is_array( $taxonomies ) ) {
+				foreach ( $taxonomies as $attr ) {
+					$name  = isset( $attr->attribute_name ) ? sanitize_key( (string) $attr->attribute_name ) : '';
+					$label = isset( $attr->attribute_label ) ? sanitize_text_field( (string) $attr->attribute_label ) : '';
+					if ( '' === $name ) {
+						continue;
+					}
+					$taxonomy = 'pa_' . $name;
+					if ( '' === $label ) {
+						$label = function_exists( 'wc_attribute_label' ) ? wc_attribute_label( $taxonomy ) : $taxonomy;
+					}
+					$options[ $taxonomy ] = $label;
+				}
+			}
+		}
+
+		if ( count( $options ) > 1 ) {
+			$fixed = [
+				'__custom__' => $options['__custom__'],
+			];
+			unset( $options['__custom__'] );
+			asort( $options, SORT_NATURAL | SORT_FLAG_CASE );
+			$options = $fixed + $options;
+		}
+
+		return $options;
 	}
 }

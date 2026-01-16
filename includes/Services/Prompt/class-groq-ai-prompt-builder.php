@@ -338,7 +338,7 @@ class Groq_AI_Prompt_Builder {
 		return $normalized;
 	}
 
-	public function build_product_context_block( $post_id, $fields, $image_mode = 'url', $image_limit = 3 ) {
+	public function build_product_context_block( $post_id, $fields, $image_mode = 'url', $image_limit = 3, $settings = null ) {
 		$post_id = absint( $post_id );
 
 		if ( ! $post_id ) {
@@ -368,8 +368,14 @@ class Groq_AI_Prompt_Builder {
 			}
 		}
 
-		if ( ! empty( $fields['attributes'] ) ) {
-			$attributes = $this->get_product_attributes_text( $post_id );
+		$attribute_includes = [];
+		if ( is_array( $settings ) && isset( $settings['product_attribute_includes'] ) && is_array( $settings['product_attribute_includes'] ) ) {
+			$attribute_includes = array_values( array_unique( array_map( 'sanitize_key', $settings['product_attribute_includes'] ) ) );
+		}
+
+		$include_attributes = ! empty( $attribute_includes ) || ! empty( $fields['attributes'] );
+		if ( $include_attributes ) {
+			$attributes = $this->get_product_attributes_text( $post_id, $attribute_includes );
 			if ( $attributes ) {
 				$parts[] = sprintf( __( 'Attributen: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $attributes );
 			}
@@ -833,7 +839,7 @@ class Groq_AI_Prompt_Builder {
 		return substr( $text, 0, $limit );
 	}
 
-	private function get_product_attributes_text( $post_id ) {
+	private function get_product_attributes_text( $post_id, $attribute_includes = [] ) {
 		if ( ! function_exists( 'wc_get_product' ) ) {
 			return '';
 		}
@@ -850,14 +856,27 @@ class Groq_AI_Prompt_Builder {
 			return '';
 		}
 
+		$attribute_includes = is_array( $attribute_includes ) ? array_values( array_unique( array_map( 'sanitize_key', $attribute_includes ) ) ) : [];
+		$include_all        = empty( $attribute_includes ) || in_array( '__all__', $attribute_includes, true );
+		$include_custom     = $include_all || in_array( '__custom__', $attribute_includes, true );
+
 		$lines = [];
 
 		foreach ( $attributes as $attribute ) {
 			if ( $attribute->is_taxonomy() ) {
-				$terms = wc_get_product_terms( $post_id, $attribute->get_name(), [ 'fields' => 'names' ] );
+				$taxonomy_name = sanitize_key( (string) $attribute->get_name() );
+				if ( ! $include_all && ! in_array( $taxonomy_name, $attribute_includes, true ) ) {
+					continue;
+				}
+
+				$terms = wc_get_product_terms( $post_id, $taxonomy_name, [ 'fields' => 'names' ] );
 				$value = implode( ', ', array_map( 'sanitize_text_field', (array) $terms ) );
-				$label = wc_attribute_label( $attribute->get_name() );
+				$label = wc_attribute_label( $taxonomy_name );
 			} else {
+				if ( ! $include_custom ) {
+					continue;
+				}
+
 				$options = $attribute->get_options();
 				$value   = implode( ', ', array_map( 'sanitize_text_field', (array) $options ) );
 				$label   = sanitize_text_field( $attribute->get_name() );

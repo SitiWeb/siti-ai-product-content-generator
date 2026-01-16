@@ -690,6 +690,14 @@ class Groq_AI_Product_Text_Settings_Page {
 		);
 
 		add_settings_field(
+			'groq_ai_product_attribute_includes',
+			__( 'Productattributen meesturen', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			[ $this, 'render_product_attribute_includes_field' ],
+			'groq-ai-product-text-prompts',
+			'groq_ai_product_text_prompts'
+		);
+
+		add_settings_field(
 			'groq_ai_response_format_compat',
 			__( 'Response-format compatibiliteit', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			[ $this, 'render_response_format_compat_field' ],
@@ -1636,6 +1644,9 @@ class Groq_AI_Product_Text_Settings_Page {
 		?>
 		<div class="groq-ai-context-defaults">
 			<?php foreach ( $definitions as $key => $definition ) :
+				if ( 'attributes' === $key ) {
+					continue;
+				}
 				$checked = ! empty( $values[ $key ] );
 				?>
 				<label>
@@ -1650,6 +1661,74 @@ class Groq_AI_Product_Text_Settings_Page {
 			<?php endforeach; ?>
 		</div>
 		<?php
+	}
+
+	public function render_product_attribute_includes_field() {
+		$settings = $this->plugin->get_settings();
+		$values   = isset( $settings['product_attribute_includes'] ) && is_array( $settings['product_attribute_includes'] )
+			? $settings['product_attribute_includes']
+			: [];
+		$values = array_values( array_unique( array_map( 'sanitize_key', $values ) ) );
+
+		$options = $this->get_product_attribute_include_options();
+		?>
+		<div class="groq-ai-attribute-includes">
+			<p class="description" style="margin-top:0;">
+				<?php esc_html_e( 'Selecteer welke productattributen je als context mee wilt sturen naar de AI. Als je niets selecteert, worden attributen niet meegestuurd (tenzij je dit eerder al had ingeschakeld via de oude instelling).', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+			</p>
+			<?php if ( empty( $options ) ) : ?>
+				<p class="description">
+					<?php esc_html_e( 'Geen WooCommerce-attributen gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+				</p>
+			<?php else : ?>
+				<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px;">
+					<?php foreach ( $options as $key => $label ) :
+						$checked = in_array( $key, $values, true );
+						?>
+						<label style="display:flex;gap:8px;align-items:flex-start;">
+							<input type="checkbox" name="<?php echo esc_attr( $this->plugin->get_option_key() ); ?>[product_attribute_includes][]" value="<?php echo esc_attr( $key ); ?>" <?php checked( $checked ); ?> />
+							<span><?php echo esc_html( $label ); ?></span>
+						</label>
+					<?php endforeach; ?>
+				</div>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	private function get_product_attribute_include_options() {
+		$options = [
+			'__custom__' => __( 'Custom attributen (niet-taxonomie)', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+		];
+
+		if ( function_exists( 'wc_get_attribute_taxonomies' ) ) {
+			$taxonomies = wc_get_attribute_taxonomies();
+			if ( is_array( $taxonomies ) ) {
+				foreach ( $taxonomies as $attr ) {
+					$name  = isset( $attr->attribute_name ) ? sanitize_key( (string) $attr->attribute_name ) : '';
+					$label = isset( $attr->attribute_label ) ? sanitize_text_field( (string) $attr->attribute_label ) : '';
+					if ( '' === $name ) {
+						continue;
+					}
+					$taxonomy = 'pa_' . $name;
+					if ( '' === $label ) {
+						$label = function_exists( 'wc_attribute_label' ) ? wc_attribute_label( $taxonomy ) : $taxonomy;
+					}
+					$options[ $taxonomy ] = $label;
+				}
+			}
+		}
+
+		if ( count( $options ) > 1 ) {
+			$fixed = [
+				'__custom__' => $options['__custom__'],
+			];
+			unset( $options['__custom__'] );
+			asort( $options, SORT_NATURAL | SORT_FLAG_CASE );
+			$options = $fixed + $options;
+		}
+
+		return $options;
 	}
 
 	public function render_response_format_compat_field() {

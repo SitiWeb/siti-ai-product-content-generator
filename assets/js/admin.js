@@ -13,6 +13,7 @@
 	const resultField = document.getElementById('groq-ai-output');
 	const jsonCopyButton = modal.querySelector('.groq-ai-copy-json');
 	const contextToggles = modal.querySelectorAll('.groq-ai-context-toggle');
+	const attributeToggles = modal.querySelectorAll('.groq-ai-attribute-toggle');
 	const resultFields = {};
 	modal.querySelectorAll('.groq-ai-result-field').forEach((field) => {
 		const key = field.getAttribute('data-field');
@@ -60,6 +61,7 @@
 			promptField.value = GroqAIGenerator.defaultPrompt;
 		}
 		resetContextToggles();
+		resetAttributeToggles();
 		setTimeout(() => promptField.focus(), 50);
 	}
 
@@ -115,6 +117,7 @@
 			payload.append('prompt', prompt);
 			payload.append('post_id', GroqAIGenerator.postId || 0);
 			payload.append('context_fields', JSON.stringify(collectContextSelection()));
+			payload.append('attribute_includes', JSON.stringify(collectAttributeSelection()));
 
 			toggleLoading(true);
 			resultWrapper.hidden = true;
@@ -458,11 +461,39 @@
 		});
 	}
 
+	function resetAttributeToggles() {
+		const defaults = Array.isArray(GroqAIGenerator.attributeIncludesDefaults)
+			? GroqAIGenerator.attributeIncludesDefaults
+			: [];
+
+		attributeToggles.forEach((toggle) => {
+			const key = toggle.getAttribute('data-attribute');
+			if (!key) {
+				return;
+			}
+			toggle.checked = defaults.includes(key);
+		});
+	}
+
 	function collectContextSelection() {
 		const selected = [];
 		contextToggles.forEach((toggle) => {
 			if (toggle.checked) {
 				selected.push(toggle.getAttribute('data-field'));
+			}
+		});
+		return selected;
+	}
+
+	function collectAttributeSelection() {
+		const selected = [];
+		attributeToggles.forEach((toggle) => {
+			if (!toggle.checked) {
+				return;
+			}
+			const key = toggle.getAttribute('data-attribute');
+			if (key) {
+				selected.push(key);
 			}
 		});
 		return selected;
