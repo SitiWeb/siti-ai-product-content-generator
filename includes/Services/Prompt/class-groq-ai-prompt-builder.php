@@ -388,7 +388,64 @@ class Groq_AI_Prompt_Builder {
 			}
 		}
 
+		if ( ! empty( $fields['brands'] ) ) {
+			$brands_context = $this->get_product_brand_context_text( $post_id );
+			if ( '' !== $brands_context ) {
+				$parts[] = sprintf( __( 'Merken: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $brands_context );
+			}
+		}
+
 		return implode( "\n\n", array_filter( $parts ) );
+	}
+
+	private function get_product_brand_context_text( $post_id ) {
+		$post_id  = absint( $post_id );
+		$taxonomy = $this->detect_brand_taxonomy();
+
+		if ( ! $post_id || '' === $taxonomy || ! taxonomy_exists( $taxonomy ) ) {
+			return '';
+		}
+
+		$terms = get_the_terms( $post_id, $taxonomy );
+		if ( empty( $terms ) || is_wp_error( $terms ) ) {
+			return '';
+		}
+
+		$entries = [];
+		foreach ( $terms as $term ) {
+			if ( ! $term || ! is_object( $term ) ) {
+				continue;
+			}
+
+			$name = isset( $term->name ) ? trim( wp_strip_all_tags( (string) $term->name ) ) : '';
+			if ( '' === $name ) {
+				continue;
+			}
+
+			$description = isset( $term->description ) ? trim( wp_strip_all_tags( (string) $term->description ) ) : '';
+			if ( '' !== $description ) {
+				$entries[] = sprintf( '%s - %s', $name, $description );
+			} else {
+				$entries[] = $name;
+			}
+		}
+
+		$entries = array_values( array_unique( array_filter( $entries ) ) );
+		if ( empty( $entries ) ) {
+			return '';
+		}
+
+		$context = implode( '; ', $entries );
+
+		/**
+		 * Filters the product brand context string added to prompts.
+		 *
+		 * @param string $context
+		 * @param int    $post_id
+		 * @param array  $terms
+		 * @param string $taxonomy
+		 */
+		return (string) apply_filters( 'groq_ai_product_brand_context', $context, $post_id, $terms, $taxonomy );
 	}
 
 	public function prepend_context_to_prompt( $prompt, $context ) {

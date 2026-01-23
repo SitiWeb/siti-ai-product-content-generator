@@ -234,6 +234,11 @@ class Groq_AI_Settings_Manager {
 					'description' => __( 'Voeg gestructureerde productattributen toe (zoals kleur, maat, materiaal).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 					'default'     => false,
 				],
+				'brands'           => [
+					'label'       => __( 'Merken', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					'description' => __( 'Voegt gekoppelde productmerken toe (detecteert WooCommerce merk-taxonomieën).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					'default'     => true,
+				],
 				'images'            => [
 					'label'       => __( 'Afbeeldingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 					'description' => __( 'Voeg een korte lijst toe met productafbeeldingen (beschrijving + URL).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
@@ -261,7 +266,7 @@ class Groq_AI_Settings_Manager {
 		$normalized  = [];
 
 		foreach ( $definitions as $key => $data ) {
-			$normalized[ $key ] = false;
+			$normalized[ $key ] = ! empty( $data['default'] );
 		}
 
 		if ( ! is_array( $fields ) ) {
