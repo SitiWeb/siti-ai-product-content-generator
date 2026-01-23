@@ -42,6 +42,7 @@ class Groq_AI_Ajax_Controller {
 			[
 				'include_top_products' => $include_top_products,
 				'top_products_limit'   => $top_products_limit,
+				'origin'               => 'term_manual',
 			]
 		);
 
@@ -92,6 +93,9 @@ class Groq_AI_Ajax_Controller {
 			$term
 		);
 
+		$options['origin'] = $force ? 'term_force_regenerate' : 'term_bulk_auto';
+		$options['force']  = $force;
+
 		$result = $this->run_term_generation( $term, $this->get_term_prompt_text( $term ), $options );
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( [ 'message' => $result->get_error_message() ], 500 );
@@ -119,18 +123,26 @@ class Groq_AI_Ajax_Controller {
 			return new WP_Error( 'groq_ai_invalid_term', __( 'Term niet gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
 		}
 
+		$taxonomy = isset( $term->taxonomy ) ? sanitize_key( (string) $term->taxonomy ) : '';
+		$term_id  = isset( $term->term_id ) ? absint( $term->term_id ) : 0;
+
 		$options = wp_parse_args(
 			$options,
 			[
 				'include_top_products' => true,
 				'top_products_limit'   => 10,
+				'origin'              => 'term_manual',
+				'force'               => false,
 			]
 		);
 
+		$origin            = isset( $options['origin'] ) ? sanitize_key( (string) $options['origin'] ) : 'term_manual';
+		$force_run         = ! empty( $options['force'] );
 		$include_top_products = ! empty( $options['include_top_products'] );
 		$top_products_limit   = isset( $options['top_products_limit'] ) ? absint( $options['top_products_limit'] ) : 10;
 		$top_products_limit   = max( 1, min( 25, $top_products_limit ) );
 
+		$logger          = $this->plugin->get_generation_logger();
 		$settings         = $this->plugin->get_settings();
 		$provider_manager = $this->plugin->get_provider_manager();
 		$provider_key     = $settings['provider'];
@@ -162,6 +174,19 @@ class Groq_AI_Ajax_Controller {
 			? $prompt_builder->prepend_term_context_to_prompt( $prompt, $context_block )
 			: $prompt_builder->prepend_context_to_prompt( $prompt, $context_block );
 
+		$usage_meta = [
+			'term_context' => [
+				'taxonomy' => $taxonomy,
+				'term_id'  => $term_id,
+				'origin'   => $origin,
+			],
+			'term_options' => [
+				'include_top_products' => $include_top_products,
+				'top_products_limit'   => $top_products_limit,
+				'force'                => $force_run,
+			],
+		];
+
 		$response_format  = null;
 		$use_response_format = $this->plugin->should_use_response_format( $provider, $settings );
 		if ( $use_response_format && method_exists( $prompt_builder, 'get_term_response_format_definition' ) ) {
@@ -187,18 +212,69 @@ class Groq_AI_Ajax_Controller {
 		);
 
 		if ( is_wp_error( $result ) ) {
+			if ( $logger ) {
+				$logger->log_generation_event(
+					[
+						'provider'      => $provider_key,
+						'model'         => $model,
+						'prompt'        => $final_prompt,
+						'response'      => '',
+						'usage'         => $usage_meta,
+						'status'        => 'error',
+						'error_message' => $result->get_error_message(),
+						'post_id'       => 0,
+					]
+				);
+			}
 			return $result;
 		}
 
 		$response_text = $this->extract_content_text( $result );
+		$response_usage = is_array( $result ) && isset( $result['usage'] ) ? $result['usage'] : [];
+		if ( ! is_array( $response_usage ) ) {
+			$response_usage = [];
+		}
+		$response_usage['term_context'] = $usage_meta['term_context'];
+		$response_usage['term_options'] = $usage_meta['term_options'];
 		$parsed        = null;
 		if ( method_exists( $prompt_builder, 'parse_term_structured_response' ) ) {
 			$parsed = $prompt_builder->parse_term_structured_response( $response_text, $settings );
+		}
+		if ( is_wp_error( $parsed ) ) {
+			if ( $logger ) {
+				$logger->log_generation_event(
+					[
+						'provider'      => $provider_key,
+						'model'         => $model,
+						'prompt'        => $final_prompt,
+						'response'      => $response_text,
+						'usage'         => $response_usage,
+						'status'        => 'error',
+						'error_message' => $parsed->get_error_message(),
+						'post_id'       => 0,
+					]
+				);
+			}
+			return $parsed;
 		}
 		if ( ! is_array( $parsed ) ) {
 			$parsed = [
 				'description' => trim( (string) $response_text ),
 			];
+		}
+
+		if ( $logger ) {
+			$logger->log_generation_event(
+				[
+					'provider' => $provider_key,
+					'model'    => $model,
+					'prompt'   => $final_prompt,
+					'response' => $response_text,
+					'usage'    => $response_usage,
+					'status'   => 'success',
+					'post_id'  => 0,
+				]
+			);
 		}
 
 		return [

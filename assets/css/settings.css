@@ -41,6 +41,14 @@
 	margin-top: 8px;
 }
 
+.groq-ai-bulk-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+	margin-top: 8px;
+}
+
 #groq-ai-bulk-status {
 	margin-top: 8px;
 }
@@ -88,4 +96,13 @@
 	to {
 		background-color: transparent;
 	}
+}
+
+.groq-ai-term-actions {
+	width: 180px;
+}
+
+.groq-ai-regenerate-term.is-busy {
+	opacity: 0.6;
+	pointer-events: none;
 }
