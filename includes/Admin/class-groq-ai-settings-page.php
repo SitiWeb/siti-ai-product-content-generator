@@ -173,10 +173,44 @@ class Groq_AI_Product_Text_Settings_Page {
 		if ( is_wp_error( $terms ) ) {
 			$terms = [];
 		}
+
+		$word_map    = [];
+		$empty_terms = [];
+		foreach ( $terms as $term ) {
+			if ( ! $term || ! is_object( $term ) ) {
+				continue;
+			}
+			$word_count                 = $this->count_words( isset( $term->description ) ? $term->description : '' );
+			$word_map[ $term->term_id ] = $word_count;
+			if ( 0 === $word_count ) {
+				$empty_terms[] = $term;
+			}
+		}
 		?>
 		<div class="wrap">
 			<h1><?php esc_html_e( 'Categorie teksten', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
 			<p><?php esc_html_e( 'Klik op een categorie om teksten te genereren en instellingen te beheren. De tabel toont de huidige woordlengte van de categorie-omschrijving.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+			<div class="groq-ai-bulk-panel">
+				<?php if ( ! empty( $empty_terms ) ) : ?>
+					<p>
+						<?php
+						printf(
+							/* translators: %d: amount of categories without description */
+							esc_html__( 'Er zijn %d categorieën zonder omschrijving. Klik op de knop hieronder om automatisch teksten te genereren.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+							count( $empty_terms )
+						);
+						?>
+					</p>
+					<p>
+						<button type="button" class="button button-primary" id="groq-ai-bulk-generate"><?php esc_html_e( 'Genereer teksten voor lege categorieën', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
+						<button type="button" class="button" id="groq-ai-bulk-cancel" hidden><?php esc_html_e( 'Stop bulk generatie', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
+					</p>
+					<div id="groq-ai-bulk-status" class="description"></div>
+					<ol id="groq-ai-bulk-log" class="groq-ai-bulk-log"></ol>
+				<?php else : ?>
+					<p class="description"><?php esc_html_e( 'Alle categorieën hebben al een omschrijving.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+				<?php endif; ?>
+			</div>
 			<table class="widefat striped">
 				<thead>
 					<tr>
@@ -193,16 +227,24 @@ class Groq_AI_Product_Text_Settings_Page {
 					<?php foreach ( $terms as $term ) : ?>
 						<?php
 							$link = $this->get_term_page_url( 'product_cat', $term->term_id );
-							$words = $this->count_words( $term->description );
+							$words = isset( $word_map[ $term->term_id ] ) ? $word_map[ $term->term_id ] : 0;
 							$count = isset( $term->count ) ? absint( $term->count ) : 0;
+							$row_classes = [ 'groq-ai-term-row' ];
+							if ( 0 === $words ) {
+								$row_classes[] = 'groq-ai-term-missing';
+							}
 						?>
-						<tr>
+						<tr class="<?php echo esc_attr( implode( ' ', $row_classes ) ); ?>" data-groq-ai-term-id="<?php echo esc_attr( (string) $term->term_id ); ?>">
 							<td>
 								<a href="<?php echo esc_url( $link ); ?>"><strong><?php echo esc_html( $term->name ); ?></strong></a>
 							</td>
 							<td><?php echo esc_html( $term->slug ); ?></td>
 							<td><?php echo esc_html( (string) $count ); ?></td>
-							<td><?php echo esc_html( (string) $words ); ?></td>
+							<td class="groq-ai-word-cell">
+								<span class="groq-ai-word-count" data-term-id="<?php echo esc_attr( (string) $term->term_id ); ?>">
+									<?php echo esc_html( (string) $words ); ?>
+								</span>
+							</td>
 						</tr>
 					<?php endforeach; ?>
 				<?php endif; ?>
@@ -334,10 +376,7 @@ class Groq_AI_Product_Text_Settings_Page {
 			$rankmath_description = (string) get_term_meta( $term_id, $rankmath_keys['description'], true );
 			$rankmath_focus_keywords = (string) get_term_meta( $term_id, $rankmath_keys['focus_keyword'], true );
 		}
-		$default_prompt = (string) $meta_prompt;
-		if ( '' === trim( $default_prompt ) ) {
-			$default_prompt = __( 'Schrijf een SEO-vriendelijke categorieomschrijving in het Nederlands. Gebruik duidelijke tussenkoppen en <p>-tags. Voeg geen prijsinformatie toe.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
-		}
+		$default_prompt = $this->get_term_prompt_text( $term, $meta_prompt );
 		?>
 		<div class="wrap">
 			<h1>
@@ -494,6 +533,57 @@ class Groq_AI_Product_Text_Settings_Page {
 			'description'  => isset( $keys['description'] ) ? sanitize_key( (string) $keys['description'] ) : 'rank_math_description',
 			'focus_keyword' => isset( $keys['focus_keyword'] ) ? sanitize_key( (string) $keys['focus_keyword'] ) : 'rank_math_focus_keyword',
 		];
+	}
+
+	private function get_term_prompt_text( $term, $custom_prompt = null ) {
+		$prompt = ( null !== $custom_prompt ) ? $custom_prompt : '';
+
+		if ( null === $custom_prompt && $term && isset( $term->term_id ) ) {
+			$prompt = get_term_meta( $term->term_id, 'groq_ai_term_custom_prompt', true );
+		}
+
+		$prompt = trim( (string) $prompt );
+		if ( '' !== $prompt ) {
+			return $prompt;
+		}
+
+		$default_prompt = __( 'Schrijf een SEO-vriendelijke categorieomschrijving in het Nederlands. Gebruik duidelijke tussenkoppen en <p>-tags. Voeg geen prijsinformatie toe.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+
+		return apply_filters( 'groq_ai_default_term_prompt', $default_prompt, $term );
+	}
+
+	private function get_terms_without_description_payload( $taxonomy ) {
+		$terms = get_terms(
+			[
+				'taxonomy'   => $taxonomy,
+				'hide_empty' => false,
+				'orderby'    => 'name',
+				'order'      => 'ASC',
+				'number'     => 0,
+			]
+		);
+
+		if ( is_wp_error( $terms ) ) {
+			return [];
+		}
+
+		$payloads = [];
+		foreach ( $terms as $term ) {
+			$description = isset( $term->description ) ? trim( wp_strip_all_tags( (string) $term->description ) ) : '';
+			if ( '' !== $description ) {
+				continue;
+			}
+
+			$payloads[] = [
+				'id'     => isset( $term->term_id ) ? absint( $term->term_id ) : 0,
+				'name'   => isset( $term->name ) ? (string) $term->name : '',
+				'slug'   => isset( $term->slug ) ? (string) $term->slug : '',
+				'count'  => isset( $term->count ) ? absint( $term->count ) : 0,
+				'url'    => esc_url( $this->get_term_page_url( $taxonomy, isset( $term->term_id ) ? $term->term_id : 0 ) ),
+			];
+		}
+
+		return array_values( $payloads );
 	}
 
 	public function handle_save_term_content() {
@@ -1882,6 +1972,37 @@ class Groq_AI_Product_Text_Settings_Page {
 					'nonce'  => wp_create_nonce( 'groq_ai_generate_term' ),
 					'taxonomy' => $taxonomy,
 					'termId' => $term_id,
+				]
+			);
+		}
+
+		if ( 'settings_page_groq-ai-product-text-categories' === $hook ) {
+			wp_enqueue_script(
+				'groq-ai-category-bulk',
+				plugins_url( 'assets/js/category-bulk.js', GROQ_AI_PRODUCT_TEXT_FILE ),
+				[],
+				GROQ_AI_PRODUCT_TEXT_VERSION,
+				true
+			);
+
+			wp_localize_script(
+				'groq-ai-category-bulk',
+				'GroqAICategoryBulk',
+				[
+					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+					'nonce'   => wp_create_nonce( 'groq_ai_bulk_generate_terms' ),
+					'taxonomy' => 'product_cat',
+					'terms'   => $this->get_terms_without_description_payload( 'product_cat' ),
+					'strings' => [
+						'statusIdle'     => __( 'Klik op de knop om voor alle lege categorieën automatisch teksten te genereren.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'statusProgress' => __( 'Bezig met categorie %1$s van %2$s: %3$s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'statusDone'     => __( 'Klaar! %d categorieën bijgewerkt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'statusStopped'  => __( 'Bulk generatie gestopt. %d categorieën bijgewerkt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'statusEmpty'    => __( 'Geen categorieën zonder omschrijving gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'logSuccess'     => __( '%1$s gevuld (%2$d woorden).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'logError'       => __( '%1$s mislukt: %2$s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'confirmStop'    => __( 'Weet je zeker dat je wilt stoppen? De huidige categorie kan onafgemaakt blijven.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					],
 				]
 			);
 		}

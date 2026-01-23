@@ -29,3 +29,63 @@
 	align-items: center;
 	margin-top: 8px;
 }
+
+.groq-ai-bulk-panel {
+	margin: 16px 0;
+	padding: 16px;
+	background: #fff;
+	border: 1px solid #dcdcde;
+}
+
+.groq-ai-bulk-panel .description {
+	margin-top: 8px;
+}
+
+#groq-ai-bulk-status {
+	margin-top: 8px;
+}
+
+#groq-ai-bulk-status[data-status='error'] {
+	color: #b32d2e;
+}
+
+#groq-ai-bulk-status[data-status='success'] {
+	color: #008a20;
+}
+
+.groq-ai-bulk-log {
+	margin: 12px 0 0;
+	padding-left: 18px;
+	max-height: 220px;
+	overflow-y: auto;
+	font-size: 13px;
+}
+
+.groq-ai-bulk-log li {
+	margin-bottom: 4px;
+}
+
+.groq-ai-bulk-log li[data-status='error'] {
+	color: #b32d2e;
+}
+
+.groq-ai-bulk-log li[data-status='success'] {
+	color: #008a20;
+}
+
+.groq-ai-term-row.groq-ai-term-missing td {
+	background: #fff8e5;
+}
+
+.groq-ai-term-row.groq-ai-term-updated td {
+	animation: groqAiTermPulse 1.8s ease-out 1;
+}
+
+@keyframes groqAiTermPulse {
+	from {
+		background-color: #e3f8eb;
+	}
+	to {
+		background-color: transparent;
+	}
+}

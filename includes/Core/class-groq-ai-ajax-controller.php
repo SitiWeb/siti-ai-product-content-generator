@@ -10,6 +10,7 @@ class Groq_AI_Ajax_Controller {
 		add_action( 'wp_ajax_groq_ai_generate_text', [ $this, 'handle_generate_text' ] );
 		add_action( 'wp_ajax_groq_ai_refresh_models', [ $this, 'handle_refresh_models' ] );
 		add_action( 'wp_ajax_groq_ai_generate_term_text', [ $this, 'handle_generate_term_text' ] );
+		add_action( 'wp_ajax_groq_ai_bulk_generate_terms', [ $this, 'handle_bulk_generate_terms_request' ] );
 	}
 
 	public function handle_generate_term_text() {
@@ -35,6 +36,101 @@ class Groq_AI_Ajax_Controller {
 			wp_send_json_error( [ 'message' => __( 'Term niet gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ], 404 );
 		}
 
+		$result = $this->run_term_generation(
+			$term,
+			$prompt,
+			[
+				'include_top_products' => $include_top_products,
+				'top_products_limit'   => $top_products_limit,
+			]
+		);
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( [ 'message' => $result->get_error_message() ], 500 );
+		}
+
+		wp_send_json_success( $result );
+	}
+
+	public function handle_bulk_generate_terms_request() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( 'Je hebt geen toestemming voor deze actie.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ], 403 );
+		}
+
+		check_ajax_referer( 'groq_ai_bulk_generate_terms', 'nonce' );
+
+		$taxonomy = isset( $_POST['taxonomy'] ) ? sanitize_key( wp_unslash( $_POST['taxonomy'] ) ) : '';
+		$term_id  = isset( $_POST['term_id'] ) ? absint( $_POST['term_id'] ) : 0;
+		$force    = ! empty( $_POST['force'] );
+
+		if ( '' === $taxonomy || ! taxonomy_exists( $taxonomy ) || ! $term_id ) {
+			wp_send_json_error( [ 'message' => __( 'Taxonomie en term_id zijn verplicht.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ], 400 );
+		}
+
+		$term = get_term( $term_id, $taxonomy );
+		if ( ! $term || is_wp_error( $term ) ) {
+			wp_send_json_error( [ 'message' => __( 'Term niet gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ], 404 );
+		}
+
+		$current_description = isset( $term->description ) ? trim( wp_strip_all_tags( (string) $term->description ) ) : '';
+		if ( '' !== $current_description && ! $force ) {
+			wp_send_json_error(
+				[
+					'message' => __( 'Categorie heeft al een omschrijving.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					'code'    => 'groq_ai_term_has_description',
+				],
+				400
+			);
+		}
+
+		$options = apply_filters(
+			'groq_ai_bulk_term_generation_options',
+			[
+				'include_top_products' => true,
+				'top_products_limit'   => 10,
+			],
+			$term
+		);
+
+		$result = $this->run_term_generation( $term, $this->get_term_prompt_text( $term ), $options );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( [ 'message' => $result->get_error_message() ], 500 );
+		}
+
+		$settings = $this->plugin->get_settings();
+		$saved    = $this->save_term_generation_result( $term, $result, $settings );
+
+		if ( is_wp_error( $saved ) ) {
+			wp_send_json_error( [ 'message' => $saved->get_error_message() ], 500 );
+		}
+
+		wp_send_json_success(
+			[
+				'term_id' => $term_id,
+				'name'    => isset( $term->name ) ? (string) $term->name : '',
+				'words'   => isset( $saved['words'] ) ? absint( $saved['words'] ) : 0,
+				'count'   => isset( $term->count ) ? absint( $term->count ) : 0,
+			]
+		);
+	}
+
+	private function run_term_generation( $term, $prompt, $options = [] ) {
+		if ( ! $term || ! is_object( $term ) ) {
+			return new WP_Error( 'groq_ai_invalid_term', __( 'Term niet gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
+		}
+
+		$options = wp_parse_args(
+			$options,
+			[
+				'include_top_products' => true,
+				'top_products_limit'   => 10,
+			]
+		);
+
+		$include_top_products = ! empty( $options['include_top_products'] );
+		$top_products_limit   = isset( $options['top_products_limit'] ) ? absint( $options['top_products_limit'] ) : 10;
+		$top_products_limit   = max( 1, min( 25, $top_products_limit ) );
+
 		$settings         = $this->plugin->get_settings();
 		$provider_manager = $this->plugin->get_provider_manager();
 		$provider_key     = $settings['provider'];
@@ -51,14 +147,13 @@ class Groq_AI_Ajax_Controller {
 			? $prompt_builder->build_term_system_prompt( $settings, $conversation_id, $term )
 			: $prompt_builder->build_system_prompt( $settings, $conversation_id );
 
-		$model = $this->plugin->get_selected_model( $provider, $settings );
 		$context_block = '';
 		if ( method_exists( $prompt_builder, 'build_term_context_block' ) ) {
 			$context_block = $prompt_builder->build_term_context_block(
 				$term,
 				[
 					'include_top_products' => $include_top_products,
-					'top_products_limit' => $top_products_limit,
+					'top_products_limit'   => $top_products_limit,
 				],
 				$settings
 			);
@@ -78,6 +173,7 @@ class Groq_AI_Ajax_Controller {
 			$final_prompt = $prompt_builder->append_response_instructions( $prompt_with_context, $settings );
 		}
 
+		$model  = $this->plugin->get_selected_model( $provider, $settings );
 		$result = $provider->generate_content(
 			[
 				'prompt'          => $final_prompt,
@@ -91,11 +187,11 @@ class Groq_AI_Ajax_Controller {
 		);
 
 		if ( is_wp_error( $result ) ) {
-			wp_send_json_error( [ 'message' => $result->get_error_message() ], 500 );
+			return $result;
 		}
 
 		$response_text = $this->extract_content_text( $result );
-		$parsed = null;
+		$parsed        = null;
 		if ( method_exists( $prompt_builder, 'parse_term_structured_response' ) ) {
 			$parsed = $prompt_builder->parse_term_structured_response( $response_text, $settings );
 		}
@@ -105,17 +201,127 @@ class Groq_AI_Ajax_Controller {
 			];
 		}
 
-		wp_send_json_success(
+		return [
+			'top_description'    => isset( $parsed['top_description'] ) ? $parsed['top_description'] : ( isset( $parsed['description'] ) ? $parsed['description'] : '' ),
+			'bottom_description' => isset( $parsed['bottom_description'] ) ? $parsed['bottom_description'] : '',
+			'meta_title'         => isset( $parsed['meta_title'] ) ? $parsed['meta_title'] : '',
+			'meta_description'   => isset( $parsed['meta_description'] ) ? $parsed['meta_description'] : '',
+			'focus_keywords'     => isset( $parsed['focus_keywords'] ) ? $parsed['focus_keywords'] : '',
+			'description'        => isset( $parsed['description'] ) ? $parsed['description'] : ( isset( $parsed['top_description'] ) ? $parsed['top_description'] : '' ),
+			'raw'                => $response_text,
+		];
+	}
+
+	private function save_term_generation_result( $term, $result, $settings ) {
+		$term_id  = isset( $term->term_id ) ? absint( $term->term_id ) : 0;
+		$taxonomy = isset( $term->taxonomy ) ? sanitize_key( (string) $term->taxonomy ) : '';
+
+		if ( ! $term_id || '' === $taxonomy ) {
+			return new WP_Error( 'groq_ai_invalid_term', __( 'Term niet gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
+		}
+
+		$top_description = '';
+		if ( isset( $result['top_description'] ) && '' !== trim( (string) $result['top_description'] ) ) {
+			$top_description = (string) $result['top_description'];
+		} elseif ( isset( $result['description'] ) ) {
+			$top_description = (string) $result['description'];
+		}
+
+		if ( '' === trim( wp_strip_all_tags( $top_description ) ) ) {
+			return new WP_Error( 'groq_ai_missing_description', __( 'De AI gaf geen omschrijving terug.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
+		}
+
+		$update = wp_update_term(
+			$term_id,
+			$taxonomy,
 			[
-				'top_description' => isset( $parsed['top_description'] ) ? $parsed['top_description'] : ( isset( $parsed['description'] ) ? $parsed['description'] : '' ),
-				'bottom_description' => isset( $parsed['bottom_description'] ) ? $parsed['bottom_description'] : '',
-				'meta_title' => isset( $parsed['meta_title'] ) ? $parsed['meta_title'] : '',
-				'meta_description' => isset( $parsed['meta_description'] ) ? $parsed['meta_description'] : '',
-				'focus_keywords' => isset( $parsed['focus_keywords'] ) ? $parsed['focus_keywords'] : '',
-				'description' => isset( $parsed['description'] ) ? $parsed['description'] : ( isset( $parsed['top_description'] ) ? $parsed['top_description'] : '' ),
-				'raw' => $response_text,
+				'description' => wp_kses_post( $top_description ),
 			]
 		);
+
+		if ( is_wp_error( $update ) ) {
+			return $update;
+		}
+
+		$bottom_key = $this->get_bottom_meta_key( $term, $settings );
+		if ( '' !== $bottom_key ) {
+			$bottom_description = isset( $result['bottom_description'] ) ? (string) $result['bottom_description'] : '';
+			update_term_meta( $term_id, $bottom_key, wp_kses_post( $bottom_description ) );
+		}
+
+		if ( $this->plugin->is_module_enabled( 'rankmath', $settings ) ) {
+			$rankmath_keys = $this->get_rankmath_term_meta_keys( $term, $settings );
+			update_term_meta( $term_id, $rankmath_keys['title'], sanitize_text_field( isset( $result['meta_title'] ) ? $result['meta_title'] : '' ) );
+			update_term_meta( $term_id, $rankmath_keys['description'], sanitize_text_field( isset( $result['meta_description'] ) ? $result['meta_description'] : '' ) );
+			update_term_meta( $term_id, $rankmath_keys['focus_keyword'], sanitize_text_field( isset( $result['focus_keywords'] ) ? $result['focus_keywords'] : '' ) );
+		}
+
+		return [
+			'words' => $this->count_words( $top_description ),
+		];
+	}
+
+	private function get_bottom_meta_key( $term, $settings ) {
+		$default_key = '';
+		if ( is_array( $settings ) && isset( $settings['term_bottom_description_meta_key'] ) ) {
+			$default_key = sanitize_key( (string) $settings['term_bottom_description_meta_key'] );
+		}
+
+		$key = apply_filters( 'groq_ai_term_bottom_description_meta_key', $default_key, $term, $settings );
+		$key = sanitize_key( (string) $key );
+
+		return '' !== $key ? $key : 'groq_ai_term_bottom_description';
+	}
+
+	private function get_rankmath_term_meta_keys( $term, $settings ) {
+		$defaults = [
+			'title'        => 'rank_math_title',
+			'description'  => 'rank_math_description',
+			'focus_keyword' => 'rank_math_focus_keyword',
+		];
+
+		$keys = apply_filters( 'groq_ai_rankmath_term_meta_keys', $defaults, $term, $settings );
+		if ( ! is_array( $keys ) ) {
+			$keys = $defaults;
+		}
+
+		return [
+			'title'        => isset( $keys['title'] ) ? sanitize_key( (string) $keys['title'] ) : 'rank_math_title',
+			'description'  => isset( $keys['description'] ) ? sanitize_key( (string) $keys['description'] ) : 'rank_math_description',
+			'focus_keyword' => isset( $keys['focus_keyword'] ) ? sanitize_key( (string) $keys['focus_keyword'] ) : 'rank_math_focus_keyword',
+		];
+	}
+
+	private function get_term_prompt_text( $term ) {
+		$prompt = '';
+
+		if ( $term && isset( $term->term_id ) ) {
+			$prompt = (string) get_term_meta( $term->term_id, 'groq_ai_term_custom_prompt', true );
+		}
+
+		$prompt = trim( $prompt );
+		if ( '' !== $prompt ) {
+			return $prompt;
+		}
+
+		$default_prompt = __( 'Schrijf een SEO-vriendelijke categorieomschrijving in het Nederlands. Gebruik duidelijke tussenkoppen en <p>-tags. Voeg geen prijsinformatie toe.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+
+		return apply_filters( 'groq_ai_default_term_prompt', $default_prompt, $term );
+	}
+
+	private function count_words( $text ) {
+		$text = wp_strip_all_tags( (string) $text );
+		$text = trim( preg_replace( '/\s+/u', ' ', $text ) );
+
+		if ( '' === $text ) {
+			return 0;
+		}
+
+		if ( preg_match_all( '/\pL[\pL\pN\']*/u', $text, $matches ) ) {
+			return count( $matches[0] );
+		}
+
+		return str_word_count( $text );
 	}
 
 	public function handle_generate_text() {
