@@ -86,6 +86,17 @@ class Groq_AI_Product_Text_Settings_Page {
 
 	}
 
+	/**
+	 * Register plugin settings with WordPress.
+	 */
+	public function register_settings() {
+		register_setting(
+			$this->plugin->get_option_key(),
+			$this->plugin->get_option_key(),
+			[ $this->plugin, 'sanitize_settings' ]
+		);
+	}
+
 	public function hide_menu_links() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
