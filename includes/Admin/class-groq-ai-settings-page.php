@@ -216,6 +216,7 @@ class Groq_AI_Product_Text_Settings_Page {
 		$google_connected       = ! empty( $settings['google_oauth_refresh_token'] );
 		$google_connected_email = isset( $settings['google_oauth_connected_email'] ) ? (string) $settings['google_oauth_connected_email'] : '';
 		$google_connected_at    = isset( $settings['google_oauth_connected_at'] ) ? absint( $settings['google_oauth_connected_at'] ) : 0;
+		$oauth_redirect         = add_query_arg( 'action', 'groq_ai_google_oauth_callback', admin_url( 'admin-post.php' ) );
 
 		?>
 		<div class="wrap">
@@ -313,12 +314,23 @@ class Groq_AI_Product_Text_Settings_Page {
 						<th scope="row"><label for="groq-ai-google-client-id"><?php esc_html_e( 'Google OAuth client ID', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
 						<td>
 							<input type="text" id="groq-ai-google-client-id" class="regular-text" name="<?php echo esc_attr( $option_key ); ?>[google_oauth_client_id]" value="<?php echo esc_attr( isset( $settings['google_oauth_client_id'] ) ? $settings['google_oauth_client_id'] : '' ); ?>" autocomplete="off" />
+							<p class="description">
+								<?php
+								printf(
+									esc_html__( 'Stel deze plugin in als OAuth-client in Google Cloud Console en gebruik onderstaande redirect-URL.', GROQ_AI_PRODUCT_TEXT_DOMAIN )
+								);
+								?>
+							</p>
 						</td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="groq-ai-google-client-secret"><?php esc_html_e( 'Google OAuth client secret', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
 						<td>
 							<input type="password" id="groq-ai-google-client-secret" class="regular-text" name="<?php echo esc_attr( $option_key ); ?>[google_oauth_client_secret]" value="<?php echo esc_attr( isset( $settings['google_oauth_client_secret'] ) ? $settings['google_oauth_client_secret'] : '' ); ?>" autocomplete="off" />
+							<p class="description">
+								<?php esc_html_e( 'Redirect URI voor OAuth (voeg exact zo toe in Google Cloud → Credentials):', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?><br />
+								<code><?php echo esc_html( $oauth_redirect ); ?></code>
+							</p>
 						</td>
 					</tr>
 					<tr>
