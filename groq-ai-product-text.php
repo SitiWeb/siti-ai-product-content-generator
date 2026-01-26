@@ -108,7 +108,6 @@ final class Groq_AI_Product_Text_Plugin {
 		$this->settings_page    = new Groq_AI_Product_Text_Settings_Page( $this, $this->get_provider_manager() );
 		$this->product_ui       = new Groq_AI_Product_Text_Product_UI( $this );
 
-		add_action( 'plugins_loaded', [ $this, 'maybe_load_textdomain_early' ], 0 );
 		add_action( 'init', [ $this, 'load_textdomain' ] );
 		add_action( 'plugins_loaded', [ $this, 'maybe_create_logs_table' ] );
 		add_action( 'load-plugins.php', [ $this, 'maybe_deactivate_if_woocommerce_missing' ] );
@@ -129,14 +128,6 @@ final class Groq_AI_Product_Text_Plugin {
 		}
 
 		$this->textdomain_loaded = true;
-	}
-
-	public function maybe_load_textdomain_early() {
-		if ( did_action( 'init' ) ) {
-			return;
-		}
-
-		$this->load_textdomain();
 	}
 
 	private function register_services() {

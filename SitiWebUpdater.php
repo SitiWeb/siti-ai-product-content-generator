@@ -33,7 +33,7 @@ class SitiWebUpdater {
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		}
 
-		$this->plugin	= get_plugin_data( $this->file );
+		$this->plugin	= get_plugin_data( $this->file, false, false );
 		$this->basename = plugin_basename( $this->file );
 		$this->active	= is_plugin_active( $this->basename );
 	}

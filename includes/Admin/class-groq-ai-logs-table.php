@@ -136,28 +136,15 @@ class Groq_AI_Logs_Table extends WP_List_Table {
 
 	protected function column_created_at( $item ) {
 		$date = esc_html( mysql2date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $item['created_at'] ) );
-		$usage = $this->get_usage_meta( $item );
-		$payload = [
-			'created_at'        => $item['created_at'],
-			'user'              => $this->column_default( $item, 'user_id' ),
-			'post_title'        => $item['post_title'],
-			'provider'          => $item['provider'],
-			'model'             => $item['model'],
-			'status'            => $item['status'],
-			'tokens_prompt'     => isset( $item['tokens_prompt'] ) ? (int) $item['tokens_prompt'] : null,
-			'tokens_completion' => isset( $item['tokens_completion'] ) ? (int) $item['tokens_completion'] : null,
-			'tokens_total'      => isset( $item['tokens_total'] ) ? (int) $item['tokens_total'] : null,
-			'prompt'            => $item['prompt'],
-			'response'          => $item['response'],
-			'error_message'     => $item['error_message'],
-			'image_context'     => isset( $usage['image_context'] ) ? $usage['image_context'] : null,
-		];
-		$encoded = esc_attr( wp_json_encode( $payload ) );
-		return sprintf(
-			'<a href="#" class="groq-ai-log-row" data-groq-log="%s">%s</a>',
-			$encoded,
-			$date
+		$url  = add_query_arg(
+			[
+				'page'   => 'groq-ai-product-text-log',
+				'log_id' => isset( $item['id'] ) ? (int) $item['id'] : 0,
+			],
+			admin_url( 'options-general.php' )
 		);
+
+		return sprintf( '<a href="%s">%s</a>', esc_url( $url ), $date );
 	}
 
 	private function get_usage_meta( $item ) {
