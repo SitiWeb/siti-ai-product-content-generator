@@ -1,93 +1,110 @@
 # SitiAI Product Teksten (WordPress plugin)
 
-Deze repository bevat de WordPress plugin waarmee productteksten via SitiAI kunnen worden gegenereerd. De plugincode leeft volledig in deze map en kan daarom veilig via git beheerd worden.
+SitiAI Product Teksten voegt een AI-gestuurde workflow toe aan WooCommerce zodat redacties product-, categorie- en merkteksten rechtstreeks binnen WordPress kunnen genereren. De plugin bundelt alle logica in deze repository (inclusief assets, taalbestanden en Docker-omgeving) en kan daardoor geheel via git beheerd en gedeployed worden.
 
-## Plugin installeren en gebruiken
+## Functionaliteiten in vogelvlucht
+- **Multi-provider AI**: selecteer Groq, OpenAI of Google Gemini en laad live model-lijsten. `Groq_AI_Model_Exclusions` filtert ongeschikte modellen en elke provider declareert eigen endpoint, API-sleutel en resp. JSON capabilities.
+- **WooCommerce productmodal**: op de productbewerkscherm verschijnt de meta-box “Gebruik AI” met een modal waarin gebruikers prompts kunnen sturen, contextvelden (titel, beschrijvingen, attributen, merken, afbeeldingen) kunnen toggelen en resultaten per veld kunnen kopiëren of direct invullen.
+- **Categorie- en merkteksten**: uitgebreide beheerschermen voor `product_cat` en gedetecteerde merk-taxonomieën bevatten overzichten met woordtellingen, bulk-acties en een termgenerator die topverkopers, interne links en (optioneel) Google-data toevoegt. Output splitst in bovenste beschrijving, onderste beschrijving en – indien Rank Math actief – SEO-velden.
+- **Prompt builder & contextbeheer**: `Groq_AI_Prompt_Builder` bouwt system prompts op basis van winkelcontext, gefixeerde conversation ID’s en geselecteerde contextvelden. Productprompts eisen strikt JSON volgens `get_structured_response_instructions`; termprompts gebruiken desgewenst OpenAI/Groq response_format.
+- **Modules**: de Rank Math-module is standaard beschikbaar en bepaalt focuskeywordlimieten plus pixel-limieten voor meta title/description. Modules zijn uitbreidbaar via filters en krijgen een eigen instellingenpagina.
+- **Google-integratie**: OAuth 2.0 koppeling met Search Console en GA4 voegt queries, sessies en engaged sessions toe aan termcontext. Tokens worden ververst via `Groq_AI_Google_OAuth_Client` en resultaten gecachet (15 min).
+- **Logging & audits**: alle generaties worden opgeslagen in `wp_groq_ai_generation_logs` met prompt, response, status en token usage. Er zijn admin-schermen voor log-overzichten en detailpagina’s.
+- **Live updates**: `SitiWebUpdater` controleert GitHub releases (`SitiWeb/siti-ai-product-content-generator`) en verzorgt binnen WordPress één-klik updates inclusief re-activatie.
 
-### Systeemeisen
+## Vereisten
+- WordPress 6.4+ en WooCommerce (de plugin deactiveert zichzelf zonder WooCommerce).
+- PHP 8.0+ (de Dockerfile gebruikt WordPress 6.9 op PHP 8.2).
+- Minstens één AI API-sleutel (Groq, OpenAI of Google Gemini). Je kunt sleutels voor meerdere providers opslaan en later wisselen.
+- Optioneel: Rank Math SEO (voor extra velden) en Google Cloud-project met Search Console & GA4 toegang voor OAuth.
 
-- WordPress 6.4 of hoger.
-- WooCommerce (de plugin controleert dit en deactiveert zichzelf als WooCommerce ontbreekt).
-- Minimaal één API-sleutel voor Groq, OpenAI of Google Gemini.
-- (Optioneel) Rank Math SEO wanneer je de extra SEO-velden wilt gebruiken.
-
-### Installatie
-
-1. Download de nieuwste release (`siti-ai-product-content-generator-x.y.z.zip`) vanaf de [GitHub Releases](https://github.com/SitiWeb/siti-ai-product-content-generator/releases) of gebruik het zip-bestand dat door de workflow in `dist/` wordt geplaatst.
-2. Ga in WordPress naar **Plugins → Nieuwe plugin → Plugin uploaden** en upload het zipbestand. Je kunt de map ook handmatig naar `wp-content/plugins/` uploaden.
+## Installatie & activatie
+### Plugin installeren
+1. Download de laatste release (`siti-ai-product-content-generator-x.y.z.zip`) vanuit GitHub Releases of gebruik het zip-bestand dat door de workflow in `dist/` verschijnt.
+2. Upload via **Plugins → Nieuwe plugin → Plugin uploaden** of plaats de map onder `wp-content/plugins/`.
 3. Activeer **SitiAI Product Teksten** en controleer dat WooCommerce actief is.
 
-### Configuratie
-
-1. Navigeer naar **Instellingen → Siti AI**.
-2. Kies een AI-aanbieder, vul de bijbehorende API-sleutel in en (optioneel) klik op **Live modellen ophalen** om beschikbare modellen te laden.
-3. Stel een standaard prompt en winkelcontext in zodat het AI-venster vooraf gevuld is.
-4. Selecteer welke productvelden standaard als context dienen (titel, beschrijvingen, attributen, …).
-5. Gebruik de knop **Ga naar modules** om bijvoorbeeld de Rank Math integratie aan of uit te zetten en de limieten aan te passen.
-6. Via **Bekijk AI-logboek** zie je alle eerdere generaties inclusief foutmeldingen of token usage.
+### Basisconfiguratie
+1. Ga naar **Instellingen → Siti AI**.
+2. Kies een provider, stel het standaardmodel in (of laad live modellen via de knop), vul de bijbehorende API-sleutel in en kies optioneel andere aanbieders.
+3. Vul winkelcontext, standaardprompt, maximale outputtokens en gewenste contextvelden. Via **Prompt & context** beheer je defaults voor attributen, merkdetectie, beeldcontext (`none`, `url`, `base64`) en het maximale aantal afbeeldingen.
+4. Stel modules (Rank Math) in via **Instellingen → Siti AI → Modules** om keywordlimieten/pixellimieten te wijzigen en de module te activeren/deactiveren.
+5. (Optioneel) Koppel Google OAuth (client ID/secret + refresh token) en configureer Search Console site + GA4 property. Gebruik de ingebouwde verbindingstest om scopes te bevestigen.
+6. Gebruik op het tabblad **Prompt & context** de velden *Term omschrijving lengte* om de gewenste tekentaantallen voor de korte (top) en lange (bottom) categorie-/merktekst vast te leggen. De AI krijgt deze waardes met een marge van ±10%.
 
 ### Productteksten genereren
+1. Open een WooCommerce-product en klik in de meta-box op **Gebruik AI**.
+2. De modal toont de standaardprompt, contextselecties en (indien ingesteld) standaard attributen. Je kunt contextvelden tijdelijk toggelen zonder globale instellingen te wijzigen.
+3. Na **Genereer tekst** verschijnt output per veld: titel (inclusief drie suggesties), slug, korte beschrijving, beschrijving en – indien Rank Math module – meta title, meta description en focus keywords. Met de knoppen kun je de inhoud kopiëren of rechtstreeks invoegen in de corresponderende WordPress velden.
+4. Iedere call wordt gelogd (status, tokens, provider) en kan via het AI-logboek worden ingezien.
+5. Ajax-acties: `groq_ai_generate_text` verwerkt productprompts, `groq_ai_refresh_models` haalt provider-specifieke modellen op.
 
-1. Open een product in WooCommerce en gebruik de meta-box **Gebruik AI** om de modal te openen.
-2. Vul (of hergebruik) een prompt, kies welke contextvelden meegestuurd worden en klik op **Genereer tekst**.
-3. De resultaten verschijnen per veld (titel, korte beschrijving, beschrijving en – indien geactiveerd – Rank Math velden). Gebruik **Kopieer** of **Vul … in** om velden direct over te nemen.
-4. Via de geavanceerde sectie kun je contextvelden tijdelijk uitschakelen; dit heeft alleen effect voor de huidige generatie.
-5. Iedere generatie wordt opgeslagen in het AI-logboek zodat je binnen WordPress kunt terugzoeken wat er is gebeurd.
+### Categorie- en merkteksten
+- Ga naar **Instellingen → Siti AI → Categorieën** of **Merken** om een overzicht te zien met productcounts en woordtellingen. Lege termen worden gemarkeerd.
+- Bovenaan staat een bulk-paneel dat een achtergrondproces start (`groq_ai_bulk_generate_terms`) voor lege termen; optioneel kun je bestaande teksten forceren.
+- Klik op een term om naar de generator te gaan. Daar kun je bovenste en onderste beschrijvingen, Rank Math velden en een term-specifieke prompt beheren. De knop **Genereer** roept `groq_ai_generate_term_text` aan, toont ruwe JSON-output en stelt je in staat de velden met één klik te vullen.
+- Context bevat: termnaam/slug/productcount, bestaande beschrijvingen (ook custom meta), topverkopende producten (max 25), automatische interne link-suggesties, merkcontext en – indien geactiveerd – Search Console queries en GA4 sessies.
+- Via de ingestelde tekentaantallen weet de AI hoeveel inhoud de korte en lange omschrijving ongeveer moeten bevatten; hij stuurt automatisch bij binnen ±10%.
 
-## Ontwikkelvereisten
+### Modules & integraties
+- **Rank Math**: bepaalt of focuskeywords + meta velden worden getoond/bewaard bij zowel producten als termen. Limieten (keywords, pixelbreedtess) worden afgedwongen in de promptinstructies en validatie.
+- **Google-data**: caching en foutafhandeling gebeurt binnen de serviceclient. Errors verschijnen als WP notices en in het log. Zorg dat de redirect-URL (`/wp-admin/admin-post.php?action=groq_ai_google_oauth_callback`) in Google Cloud staat.
+- **Response-format compatibiliteit**: toggle onder Algemene instellingen om JSON Schema mode te forceren wanneer een provider geen native `response_format` ondersteunt.
 
-- Docker Desktop of Docker Engine + Docker Compose v2
+### AI-logboek & troubleshooting
+- Via **Instellingen → Siti AI → AI-logboek** heb je een WP_List_Table met filters, zoekveld en pagination. Klik op een regel om de detailpagina te zien (prompt, response, tokens, foutmelding, gekoppeld product en gebruiker).
+- De `Groq_AI_Generation_Logger` creëert automatisch de DB-tabel bij `plugins_loaded`; bij ontbrekende tabellen kun je `WP_DEBUG` gebruiken om fouten te lezen.
+- Alle fouten worden ook verstuurd naar `WC_Logger` (indien aanwezig) met bron `groq-ai-product-text`.
 
-## Ontwikkelen in de Docker omgeving
+## Hooks & extensies
+- `groq_ai_brand_taxonomy` / `groq_ai_brand_taxonomy_candidates`: overschrijf detectie van merk-taxonomie.
+- `groq_ai_product_brand_context`: wijzig de tekst die voor merkcontext wordt meegestuurd.
+- `groq_ai_term_google_context`: voeg extra analytics of SEO-data toe aan termcontext.
+- `groq_ai_model_exclusions`: pas geblokkeerde modellen per provider aan.
+- `groq_ai_prompt_default_context_fields`: stel andere standaardcontextvelden in.
+- `groq_ai_bulk_term_generation_options`: beïnvloed bulk-run opties (bijv. aantal top-producten).
+- Algemene WordPress filters zoals `plugin_action_links` of `admin_menu` kunnen gebruikt worden voor extra UI-knoppen; `Groq_AI_Service_Container` maakt het eenvoudig om services te vervangen of uit te breiden.
 
-1. Start de containers (WordPress + MariaDB + phpMyAdmin):
-   ```bash
-   docker compose up --build -d
-   ```
-2. Open http://localhost:8080 om de WordPress installatie te doorlopen. Gebruik `db` als host en de volgende databasegegevens:
-   - database: `wordpress`
-   - gebruiker: `wordpress`
-   - wachtwoord: `wordpress`
-3. Activeer in het WordPress dashboard de plugin **SitiAI Product Teksten** (deze repository wordt in de container gemount naar `wp-content/plugins/siti-ai-product-content-generator`).
+## Lokale ontwikkeling
+### Voorwaarden
+- Docker Desktop of Docker Engine + Docker Compose v2.
+- Node of build tooling is niet vereist; alle assets staan reeds gecompileerd in `assets/`.
 
-### Handige commando's
-
-- Shell in de WordPress container om bijvoorbeeld `wp` CLI of git te draaien binnen de container:
-  ```bash
-  docker compose exec wordpress bash
-  ```
-- WP-CLI is al aanwezig:
-  ```bash
-  docker compose exec wordpress wp plugin list
-  ```
-- Bekijk de database via phpMyAdmin op http://localhost:8081 (gebruik dezelfde DB-gebruiker/WW als hierboven).
-- Containers stoppen:
-  ```bash
-  docker compose down
-  ```
-
-## Werken met git
-
-De pluginbestanden blijven op de host staan en worden alleen als bind-mount in de container gebruikt. Daardoor kun je git gewoon op je machine gebruiken:
-
+### Containers starten
 ```bash
-git status
-git add .
-git commit -m "Beschrijf je wijziging"
-git push origin <branch>
+docker compose up --build -d
 ```
+- WordPress: http://localhost:8082
+- phpMyAdmin: http://localhost:8085
+- MariaDB: poort 3307 (database, user, wachtwoord = `wordpress`)
 
-Je kunt optioneel vanuit de container git gebruiken (zelfde codepad) wanneer je liever binnen Docker werkt.
+### WordPress initialiseren
+1. Bezoek http://localhost:8082 en volg de standaard WordPress-installatie (gebruik de `db` host en bovengenoemde databasegegevens).
+2. Log in, activeer WooCommerce (indien niet automatisch) en activeer daarna **SitiAI Product Teksten**. De plugin is als bind-mount aanwezig onder `wp-content/plugins/siti-ai-product-content-generator`.
 
-## Tips
+### Handige commando’s
+- Shell binnen de WordPress-container: `docker compose exec wordpress bash`
+- WP-CLI gebruiken: `docker compose exec wordpress wp plugin list`
+- Logs volgen: `docker compose logs -f wordpress`
+- Containers stoppen: `docker compose down`
+- Helemaal opnieuw beginnen (verwijdert volumes): `docker compose down -v`
 
-- De databank (`db_data`) en WordPress bestanden (`wordpress_data`) worden in Docker volumes opgeslagen zodat je data behouden blijft tussen sessies.
-- Wil je helemaal opnieuw beginnen? Voer `docker compose down -v` uit om de volumes te verwijderen.
+Alle code staat buiten de container, dus je kunt op de host `git status`, `git commit` etc. draaien. De Dockerfile (WordPress 6.9 / PHP 8.2) installeert hulpmiddelen zoals git, wp-cli en mariadb-client.
 
-## Releasen via GitHub Actions
+## Release & updates
+1. Verhoog de `Version` header in `groq-ai-product-text.php` en commit de wijzigingen.
+2. Push naar `main` of start handmatig de GitHub Action **Build & Release Plugin**. De workflow creëert een distributie-zip, maakt tag `vX.Y.Z` en publiceert een GitHub Release met asset.
+3. Productiesites met de plugin krijgen een update-notificatie via `SitiWebUpdater` en kunnen vanuit het WordPress dashboard upgraden.
 
-De workflow `.github/workflows/release.yml` bouwt automatisch een distributie-zip van de plugin, maakt een git-tag (`vX.Y.Z`) op basis van de versie in `groq-ai-product-text.php` en publiceert een GitHub Release met het zipbestand als asset.
+## Mappenstructuur
+- `groq-ai-product-text.php`: hoofdbestand dat services, providers, admin-schermen en hooks initialiseert.
+- `includes/Core`: service container, AJAX-controller en model-exclusiehulpen.
+- `includes/Admin`: instellingenpagina’s, meta-box UI, logboek en termoverzichten.
+- `includes/Providers`: implementaties voor Groq, OpenAI en Google (Gemini), inclusief live model listing en requestafhandeling.
+- `includes/Services`: gedeelde services zoals prompt builder, settings manager, conversatiebeheer, logging en Google-clients.
+- `assets/css` & `assets/js`: statische bestanden voor de WordPress admin experience.
+- `languages`: `.po/.mo` bestanden voor vertalingen.
+- `docker` + `docker-compose.yml`: lokale ontwikkelomgeving.
+- `snippets` & `assets/img`: aanvullende hulpmiddelen en marketingmateriaal.
 
-1. Werk de `Version`-header in `groq-ai-product-text.php` bij en commit de wijzigingen.
-2. Push naar `main` of start handmatig de workflow **Build & Release Plugin** via **Actions → Run workflow** (optioneel met extra release notes).
-3. De workflow slaat releases over wanneer een tag met dezelfde versie al bestaat.
+Met deze README heb je een startpunt voor zowel functionele gebruikers (hoe gebruik ik de plugin) als ontwikkelaars (hoe werkt de codebase, hoe ontwikkel ik lokaal, hoe release ik). Vragen of verbeteringen? Open een issue of start een PR.

@@ -537,16 +537,38 @@ class Groq_AI_Prompt_Builder {
 		$keyword_limit    = $this->settings_manager->get_rankmath_focus_keyword_limit( $settings );
 		$title_pixels     = $this->settings_manager->get_rankmath_meta_title_pixel_limit( $settings );
 		$desc_pixels      = $this->settings_manager->get_rankmath_meta_description_pixel_limit( $settings );
+		$top_char_range   = $this->get_char_limit_range_values( $this->settings_manager->get_term_top_description_char_limit( $settings ) );
+		$bottom_char_range = $this->get_char_limit_range_values( $this->settings_manager->get_term_bottom_description_char_limit( $settings ) );
+
+		$top_description_text = __( 'Korte HTML-omschrijving (1 alinea) voor de standaard WordPress term description. Exact één alinea in <p>-tags.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+		if ( $top_char_range ) {
+			$top_description_text .= ' ' . sprintf(
+				__( 'Doel: ~%1$d tekens (±10%% ⇒ %2$d–%3$d).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				$top_char_range['limit'],
+				$top_char_range['min'],
+				$top_char_range['max']
+			);
+		}
+
+		$bottom_description_text = __( 'Uitgebreide HTML-omschrijving (helemaal onderaan), 2–4 alinea’s, met paragrafen en eventueel lijstjes.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+		if ( $bottom_char_range ) {
+			$bottom_description_text .= ' ' . sprintf(
+				__( 'Doel: ~%1$d tekens (±10%% ⇒ %2$d–%3$d).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				$bottom_char_range['limit'],
+				$bottom_char_range['min'],
+				$bottom_char_range['max']
+			);
+		}
 
 		$properties = [
 			'top_description' => [
 				'type'        => 'string',
-				'description' => __( 'Korte HTML-omschrijving (1 alinea) voor de standaard WordPress term description. Exact één alinea in <p>-tags.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'description' => $top_description_text,
 				'minLength'   => 20,
 			],
 			'bottom_description' => [
 				'type'        => 'string',
-				'description' => __( 'Uitgebreide HTML-omschrijving (helemaal onderaan), 2–4 alinea’s, met paragrafen en eventueel lijstjes.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'description' => $bottom_description_text,
 				'minLength'   => 20,
 			],
 		];
@@ -675,6 +697,8 @@ class Groq_AI_Prompt_Builder {
 			'"top_description":"..."',
 			'"bottom_description":"..."',
 		];
+		$top_char_range = $this->get_char_limit_range_values( $this->settings_manager->get_term_top_description_char_limit( $settings ) );
+		$bottom_char_range = $this->get_char_limit_range_values( $this->settings_manager->get_term_bottom_description_char_limit( $settings ) );
 
 		$rankmath_enabled = $this->settings_manager->is_module_enabled( 'rankmath', $settings );
 		if ( $rankmath_enabled ) {
@@ -693,7 +717,40 @@ class Groq_AI_Prompt_Builder {
 		$instruction .= ' ' . __( 'Zorg dat top_description en bottom_description geldige HTML bevatten. top_description moet exact één alinea zijn in <p>-tags. bottom_description moet 2–4 alinea’s bevatten.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
 		$instruction .= ' ' . __( 'Voeg geen extra tekst buiten het JSON-object toe.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
 		$instruction .= ' ' . __( 'Als in de context een sectie "Interne links" staat, verwerk dan 2–5 van deze links natuurlijk in bottom_description als HTML-links (<a href="URL">Anker</a>).', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+		if ( $top_char_range ) {
+			$instruction .= ' ' . sprintf(
+				__( 'Houd top_description rond %1$d tekens en blijf tussen %2$d en %3$d tekens (±10%% marge).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				$top_char_range['limit'],
+				$top_char_range['min'],
+				$top_char_range['max']
+			);
+		}
+		if ( $bottom_char_range ) {
+			$instruction .= ' ' . sprintf(
+				__( 'Houd bottom_description rond %1$d tekens en blijf tussen %2$d en %3$d tekens (±10%% marge).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				$bottom_char_range['limit'],
+				$bottom_char_range['min'],
+				$bottom_char_range['max']
+			);
+		}
 		return $instruction;
+	}
+
+	private function get_char_limit_range_values( $limit ) {
+		$limit = absint( $limit );
+
+		if ( $limit <= 0 ) {
+			return null;
+		}
+
+		$min = (int) floor( $limit * 0.9 );
+		$max = (int) ceil( $limit * 1.1 );
+
+		return [
+			'limit' => $limit,
+			'min'   => max( 1, $min ),
+			'max'   => max( $min, $max ),
+		];
 	}
 
 	private function resolve_term_bottom_description_meta_key( $term = null, $settings = null ) {
@@ -716,9 +773,15 @@ class Groq_AI_Prompt_Builder {
 				'post_status'    => 'publish',
 				'posts_per_page' => $limit,
 				'no_found_rows'  => true,
-				'meta_key'       => 'total_sales',
-				'orderby'        => 'meta_value_num',
+				'orderby'        => 'date',
 				'order'          => 'DESC',
+				'meta_query'     => [
+					[
+						'key'     => '_stock_status',
+						'value'   => 'instock',
+						'compare' => '=',
+					],
+				],
 				'tax_query'      => [
 					[
 						'taxonomy' => $taxonomy,

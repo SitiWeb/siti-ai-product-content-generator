@@ -635,11 +635,12 @@ class Groq_AI_Product_Text_Settings_Page {
 						<th><?php esc_html_e( 'Slug', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
 						<th><?php esc_html_e( 'Producten', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
 						<th><?php esc_html_e( 'Woorden (omschrijving)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
+						<th><?php esc_html_e( 'Acties', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
 				<?php if ( empty( $rows ) ) : ?>
-					<tr><td colspan="4"><?php esc_html_e( 'Geen categorieën gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></td></tr>
+					<tr><td colspan="5"><?php esc_html_e( 'Geen categorieën gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></td></tr>
 				<?php else : ?>
 					<?php foreach ( $rows as $row ) : ?>
 						<?php
@@ -658,6 +659,11 @@ class Groq_AI_Product_Text_Settings_Page {
 							<td><?php echo esc_html( isset( $row['slug'] ) ? $row['slug'] : '' ); ?></td>
 							<td><?php echo esc_html( (string) $count ); ?></td>
 							<td class="groq-ai-word-cell"><span class="groq-ai-word-count"><?php echo esc_html( (string) $words ); ?></span></td>
+							<td class="groq-ai-term-actions">
+								<button type="button" class="button button-secondary groq-ai-regenerate-term" data-term-id="<?php echo esc_attr( isset( $row['id'] ) ? (string) $row['id'] : '' ); ?>">
+									<?php esc_html_e( 'Genereer opnieuw', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+								</button>
+							</td>
 						</tr>
 					<?php endforeach; ?>
 				<?php endif; ?>
@@ -903,6 +909,8 @@ class Groq_AI_Product_Text_Settings_Page {
 		$image_mode   = $this->plugin->get_image_context_mode( $settings );
 		$image_limit  = $this->plugin->get_image_context_limit( $settings );
 		$preview      = $this->plugin->build_prompt_template_preview( $settings );
+		$term_top_limit = $this->plugin->get_term_top_description_char_limit( $settings );
+		$term_bottom_limit = $this->plugin->get_term_bottom_description_char_limit( $settings );
 
 		?>
 		<div class="wrap">
@@ -953,6 +961,22 @@ class Groq_AI_Product_Text_Settings_Page {
 					<tr>
 						<th scope="row"><?php esc_html_e( 'Productattributen', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
 						<td><?php $this->render_product_attribute_includes_field(); ?></td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Term omschrijving lengte (tekens)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
+						<td>
+							<label style="display:block; margin-bottom:8px;">
+								<span><?php esc_html_e( 'Korte omschrijving (top_description)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></span><br />
+								<input type="number" name="<?php echo esc_attr( $option_key ); ?>[term_top_description_char_limit]" value="<?php echo esc_attr( $term_top_limit ); ?>" min="100" max="5000" step="10" />
+							</label>
+							<label style="display:block;">
+								<span><?php esc_html_e( 'Lange omschrijving (bottom_description)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></span><br />
+								<input type="number" name="<?php echo esc_attr( $option_key ); ?>[term_bottom_description_char_limit]" value="<?php echo esc_attr( $term_bottom_limit ); ?>" min="100" max="5000" step="10" />
+							</label>
+							<p class="description">
+								<?php esc_html_e( 'Deze waardes worden doorgegeven aan de AI met een marge van ±10%. Gebruik dit om bijvoorbeeld short-form (bv. 600 tekens) en long-form (bv. 1200 tekens) teksten te sturen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+							</p>
+						</td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="groq-ai-image-mode"><?php esc_html_e( 'Afbeeldingen als context', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
@@ -1463,6 +1487,7 @@ class Groq_AI_Product_Text_Settings_Page {
 
 		if ( 0 === strpos( (string) $hook, 'settings_page_groq-ai-product-text-categories' ) ) {
 			$bulk_taxonomy    = 'product_cat';
+			$bulk_allow_regen = true;
 			$bulk_strings     = [
 				'statusIdle'     => __( 'Bulk gestart. AI werkt de geselecteerde categorieën bij…', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 				'statusProgress' => __( 'Categorie %1$s van %2$s: %3$s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
@@ -1472,6 +1497,11 @@ class Groq_AI_Product_Text_Settings_Page {
 				'logSuccess'     => __( '%1$s gevuld (%2$d woorden).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 				'logError'       => __( '%1$s mislukt: %2$s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 				'confirmStop'    => __( 'Weet je zeker dat je wilt stoppen? De huidige categorie kan onafgemaakt blijven.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'confirmRegenerate'  => __( 'Wil je categorie %s opnieuw laten schrijven?', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'regenerateProgress' => __( '%s wordt opnieuw geschreven…', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'regenerateDone'     => __( '%s is bijgewerkt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'regenerateError'    => __( 'Kon %1$s niet bijwerken: %2$s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'regenerateBlocked'  => __( 'Wacht tot de bulk generatie klaar is voordat je een categorie opnieuw genereert.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			];
 		} elseif ( 0 === strpos( (string) $hook, 'settings_page_groq-ai-product-text-brands' ) ) {
 			$detected_taxonomy = $this->detect_brand_taxonomy();

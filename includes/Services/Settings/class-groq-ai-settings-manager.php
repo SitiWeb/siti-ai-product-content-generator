@@ -52,6 +52,8 @@ class Groq_AI_Settings_Manager {
 			'image_context_mode' => 'url',
 			'image_context_limit' => 3,
 			'response_format_compat' => false,
+			'term_top_description_char_limit' => 600,
+			'term_bottom_description_char_limit' => 1200,
 		];
 
 		$settings = get_option( $this->option_key, [] );
@@ -77,6 +79,15 @@ class Groq_AI_Settings_Manager {
 
 		$settings['product_attribute_includes'] = $this->sanitize_product_attribute_includes(
 			isset( $settings['product_attribute_includes'] ) ? $settings['product_attribute_includes'] : []
+		);
+
+		$settings['term_top_description_char_limit'] = $this->sanitize_term_description_char_limit_value(
+			isset( $settings['term_top_description_char_limit'] ) ? $settings['term_top_description_char_limit'] : $defaults['term_top_description_char_limit'],
+			$defaults['term_top_description_char_limit']
+		);
+		$settings['term_bottom_description_char_limit'] = $this->sanitize_term_description_char_limit_value(
+			isset( $settings['term_bottom_description_char_limit'] ) ? $settings['term_bottom_description_char_limit'] : $defaults['term_bottom_description_char_limit'],
+			$defaults['term_bottom_description_char_limit']
 		);
 
 		return $settings;
@@ -114,6 +125,8 @@ class Groq_AI_Settings_Manager {
 			'image_context_mode' => 'url',
 			'image_context_limit' => 3,
 			'response_format_compat' => false,
+			'term_top_description_char_limit' => 600,
+			'term_bottom_description_char_limit' => 1200,
 		];
 
 		$current_settings = $this->all();
@@ -151,6 +164,15 @@ class Groq_AI_Settings_Manager {
 			$context_fields['images'] = true;
 		}
 
+		$top_char_limit = $this->sanitize_term_description_char_limit_value(
+			isset( $raw_input['term_top_description_char_limit'] ) ? $raw_input['term_top_description_char_limit'] : $defaults['term_top_description_char_limit'],
+			$defaults['term_top_description_char_limit']
+		);
+		$bottom_char_limit = $this->sanitize_term_description_char_limit_value(
+			isset( $raw_input['term_bottom_description_char_limit'] ) ? $raw_input['term_bottom_description_char_limit'] : $defaults['term_bottom_description_char_limit'],
+			$defaults['term_bottom_description_char_limit']
+		);
+
 		return [
 			'provider'       => $provider,
 			'model'          => $model,
@@ -174,6 +196,8 @@ class Groq_AI_Settings_Manager {
 			'response_format_compat' => ! empty( $raw_input['response_format_compat'] ),
 			'image_context_mode' => $image_mode,
 			'image_context_limit' => $image_limit,
+			'term_top_description_char_limit' => $top_char_limit,
+			'term_bottom_description_char_limit' => $bottom_char_limit,
 			'context_fields' => $context_fields,
 			'modules'        => $this->sanitize_modules_settings(
 				$modules_posted ? $raw_input['modules'] : [],
@@ -209,6 +233,22 @@ class Groq_AI_Settings_Manager {
 		}
 
 		return $clean;
+	}
+
+	private function sanitize_term_description_char_limit_value( $value, $default ) {
+		$default_value = absint( $default ) > 0 ? absint( $default ) : 600;
+
+		if ( null === $value || '' === $value ) {
+			$value = $default_value;
+		}
+
+		$value = absint( $value );
+
+		if ( $value <= 0 ) {
+			$value = $default_value;
+		}
+
+		return max( 100, min( 5000, $value ) );
 	}
 
 	public function get_context_field_definitions() {
@@ -360,6 +400,26 @@ class Groq_AI_Settings_Manager {
 		$limit = isset( $settings['image_context_limit'] ) ? $settings['image_context_limit'] : 3;
 
 		return $this->sanitize_image_context_limit_value( $limit );
+	}
+
+	public function get_term_top_description_char_limit( $settings = null ) {
+		if ( null === $settings ) {
+			$settings = $this->all();
+		}
+
+		$value = isset( $settings['term_top_description_char_limit'] ) ? $settings['term_top_description_char_limit'] : 600;
+
+		return $this->sanitize_term_description_char_limit_value( $value, 600 );
+	}
+
+	public function get_term_bottom_description_char_limit( $settings = null ) {
+		if ( null === $settings ) {
+			$settings = $this->all();
+		}
+
+		$value = isset( $settings['term_bottom_description_char_limit'] ) ? $settings['term_bottom_description_char_limit'] : 1200;
+
+		return $this->sanitize_term_description_char_limit_value( $value, 1200 );
 	}
 
 	public function is_response_format_compat_enabled( $settings = null ) {
