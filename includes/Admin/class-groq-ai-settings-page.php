@@ -1,14 +1,11 @@
 <?php
 
-class Groq_AI_Product_Text_Settings_Page {
-	private $plugin;
+class Groq_AI_Product_Text_Settings_Page extends Groq_AI_Admin_Base {
 	private $provider_manager;
-	private $brand_taxonomy = null;
-	private $term_overview_cache = [];
 
-	public function __construct( $plugin, Groq_AI_Provider_Manager $provider_manager ) {
-		$this->plugin            = $plugin;
-		$this->provider_manager  = $provider_manager;
+	public function __construct( Groq_AI_Product_Text_Plugin $plugin, Groq_AI_Provider_Manager $provider_manager ) {
+		parent::__construct( $plugin );
+		$this->provider_manager = $provider_manager;
 
 		add_action( 'admin_menu', [ $this, 'register_settings_pages' ] );
 		add_action( 'admin_init', [ $this, 'register_settings' ] );
@@ -17,7 +14,6 @@ class Groq_AI_Product_Text_Settings_Page {
 		add_action( 'admin_post_groq_ai_google_oauth_start', [ $this, 'handle_google_oauth_start' ] );
 		add_action( 'admin_post_groq_ai_google_oauth_callback', [ $this, 'handle_google_oauth_callback' ] );
 		add_action( 'admin_post_groq_ai_google_oauth_disconnect', [ $this, 'handle_google_oauth_disconnect' ] );
-		add_action( 'admin_post_groq_ai_save_term_content', [ $this, 'handle_save_term_content' ] );
 		add_action( 'admin_post_groq_ai_google_test_connection', [ $this, 'handle_google_test_connection' ] );
 	}
 
@@ -32,47 +28,11 @@ class Groq_AI_Product_Text_Settings_Page {
 
 		add_submenu_page(
 			'options-general.php',
-			__( 'Siti AI Categorie teksten', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-			__( 'Siti AI Categorieën', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-			'manage_options',
-			'groq-ai-product-text-categories',
-			[ $this, 'render_categories_overview_page' ]
-		);
-
-		add_submenu_page(
-			'options-general.php',
-			__( 'Siti AI Merk teksten', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-			__( 'Siti AI Merken', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-			'manage_options',
-			'groq-ai-product-text-brands',
-			[ $this, 'render_brands_overview_page' ]
-		);
-
-		add_submenu_page(
-			'options-general.php',
-			__( 'Siti AI Term tekst', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-			__( 'Siti AI Term tekst', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-			'manage_options',
-			'groq-ai-product-text-term',
-			[ $this, 'render_term_generator_page' ]
-		);
-
-		add_submenu_page(
-			'options-general.php',
 			__( 'Siti AI Modules', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			__( 'Siti AI Modules', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			'manage_options',
 			'groq-ai-product-text-modules',
 			[ $this, 'render_modules_page' ]
-		);
-
-		add_submenu_page(
-			'options-general.php',
-			__( 'Siti AI AI-logboek', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-			__( 'Siti AI AI-logboek', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-			'manage_options',
-			'groq-ai-product-text-logs',
-			[ $this, 'render_logs_page' ]
 		);
 
 		add_submenu_page(
@@ -84,32 +44,7 @@ class Groq_AI_Product_Text_Settings_Page {
 			[ $this, 'render_prompt_settings_page' ]
 		);
 
-		add_submenu_page(
-			'options-general.php',
-			__( 'Siti AI Log detail', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-			__( 'Siti AI Log detail', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-			'manage_options',
-			'groq-ai-product-text-log',
-			[ $this, 'render_log_detail_page' ]
-		);
-
 	}
-	private function get_page_url( $slug = 'groq-ai-product-text', $args = [] ) {
-		$slug = sanitize_key( (string) $slug );
-		$url  = add_query_arg(
-			[
-				'page' => $slug,
-			],
-			admin_url( 'options-general.php' )
-		);
-
-		if ( ! empty( $args ) ) {
-			$url = add_query_arg( $args, $url );
-		}
-
-		return $url;
-	}
-
 	private function get_request_redirect_url( $field, $page_slug = 'groq-ai-product-text' ) {
 		$default = $this->get_page_url( $page_slug );
 		$value   = isset( $_REQUEST[ $field ] ) ? wp_unslash( $_REQUEST[ $field ] ) : '';
@@ -148,22 +83,6 @@ class Groq_AI_Product_Text_Settings_Page {
 		}
 
 		wp_safe_redirect( add_query_arg( $args, $redirect ) );
-		exit;
-	}
-
-	private function redirect_with_term_notice( $taxonomy, $term_id, $type, $message = '', $status = 'success' ) {
-		$url = ( $taxonomy && $term_id ) ? $this->get_term_page_url( $taxonomy, $term_id ) : $this->get_page_url( 'groq-ai-product-text-categories' );
-
-		$args = [
-			'groq_ai_term_notice' => sanitize_key( (string) $type ),
-			'groq_ai_term_status' => sanitize_key( (string) $status ),
-		];
-
-		if ( '' !== $message ) {
-			$args['groq_ai_term_notice_message'] = rawurlencode( (string) $message );
-		}
-
-		wp_safe_redirect( add_query_arg( $args, $url ) );
 		exit;
 	}
 
@@ -220,6 +139,7 @@ class Groq_AI_Product_Text_Settings_Page {
 		$google_safety_settings = $this->plugin->get_google_safety_settings( $settings );
 		$google_safety_categories = $this->plugin->get_google_safety_categories();
 		$google_safety_thresholds = $this->plugin->get_google_safety_thresholds();
+		$renderer = $this->plugin->create_settings_renderer( $settings );
 
 		?>
 		<div class="wrap">
@@ -248,143 +168,158 @@ class Groq_AI_Product_Text_Settings_Page {
 			<form method="post" action="options.php">
 				<?php settings_fields( $option_key ); ?>
 				<h2><?php esc_html_e( 'AI-aanbieder', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row"><label for="groq-ai-provider"><?php esc_html_e( 'Aanbieder', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
-						<td>
-							<select id="groq-ai-provider" name="<?php echo esc_attr( $option_key ); ?>[provider]">
-								<?php foreach ( $providers as $provider ) :
-									$provider_key = $provider->get_key();
-									?>
-									<option value="<?php echo esc_attr( $provider_key ); ?>" <?php selected( $settings['provider'], $provider_key ); ?>><?php echo esc_html( $provider->get_label() ); ?></option>
-								<?php endforeach; ?>
-							</select>
-							<p class="description"><?php esc_html_e( 'Selecteer welke aanbieder de product- en termteksten schrijft.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="groq-ai-model-select"><?php esc_html_e( 'Model', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
-						<td>
-							<div class="groq-ai-model-field">
-								<select id="groq-ai-model-select" name="<?php echo esc_attr( $option_key ); ?>[model]" data-current-model="<?php echo esc_attr( isset( $settings['model'] ) ? $settings['model'] : '' ); ?>">
-									<option value="" selected="selected"><?php esc_html_e( 'Selecteer eerst een aanbieder', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></option>
-								</select>
-							</div>
-							<button type="button" class="button" id="groq-ai-refresh-models"><?php esc_html_e( 'Live modellen ophalen', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
-							<p id="groq-ai-refresh-models-status" class="description"></p>
-						</td>
-					</tr>
-					<?php foreach ( $providers as $provider ) :
-						$provider_key = $provider->get_key();
-						$option_field = $provider->get_option_key();
-						$value        = isset( $settings[ $option_field ] ) ? (string) $settings[ $option_field ] : '';
-						?>
-						<tr id="groq_ai_api_key_<?php echo esc_attr( $provider_key ); ?>" data-provider-row="<?php echo esc_attr( $provider_key ); ?>">
-							<th scope="row"><label for="groq-ai-api-<?php echo esc_attr( $provider_key ); ?>"><?php esc_html_e( 'API-sleutel', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
-							<td>
-								<input type="password" id="groq-ai-api-<?php echo esc_attr( $provider_key ); ?>" class="regular-text" name="<?php echo esc_attr( $option_key ); ?>[<?php echo esc_attr( $option_field ); ?>]" value="<?php echo esc_attr( $value ); ?>" autocomplete="off" />
-								<p class="description"><?php printf( esc_html__( 'Voer de API-sleutel in voor %s.', GROQ_AI_PRODUCT_TEXT_DOMAIN ), esc_html( $provider->get_label() ) ); ?></p>
-								<?php if ( 'google' === $provider_key && ! empty( $google_safety_categories ) ) : ?>
-									<div class="groq-ai-google-safety-settings" style="margin-top:16px; padding:16px; border:1px solid #dcdcde; background:#f6f7f7;">
-										<strong><?php esc_html_e( 'Gemini safety filters', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
-										<p class="description" style="margin-top:4px;"><?php esc_html_e( 'Kies optioneel welke beleidscategorieën je zelf instelt. Laat op "Google standaard" om geen safetySettings mee te sturen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
-										<?php foreach ( $google_safety_categories as $category_key => $info ) :
-											$category_label = isset( $info['label'] ) ? $info['label'] : $category_key;
-											$category_description = isset( $info['description'] ) ? $info['description'] : '';
-											$selected_threshold = isset( $google_safety_settings[ $category_key ] ) ? $google_safety_settings[ $category_key ] : '';
-											$field_id = 'groq-ai-google-safety-' . sanitize_html_class( $category_key );
-											?>
-											<label for="<?php echo esc_attr( $field_id ); ?>" style="display:block; margin:12px 0 4px;">
-												<span style="display:block; margin-bottom:4px;"><strong><?php echo esc_html( $category_label ); ?></strong></span>
-												<select id="<?php echo esc_attr( $field_id ); ?>" name="<?php echo esc_attr( $option_key ); ?>[google_safety_settings][<?php echo esc_attr( $category_key ); ?>]" style="max-width:280px;">
-													<?php foreach ( $google_safety_thresholds as $threshold_key => $threshold_label ) : ?>
-														<option value="<?php echo esc_attr( $threshold_key ); ?>" <?php selected( $selected_threshold, $threshold_key ); ?>><?php echo esc_html( $threshold_label ); ?></option>
-													<?php endforeach; ?>
-												</select>
-												<?php if ( '' !== $category_description ) : ?>
-													<p class="description" style="margin:4px 0 0;"><?php echo esc_html( $category_description ); ?></p>
-												<?php endif; ?>
-											</label>
-										<?php endforeach; ?>
-									</div>
-								<?php endif; ?>
-							</td>
-						</tr>
-					<?php endforeach; ?>
-				</table>
+				<?php
+				$renderer->open_table();
+				$provider_options = [];
+				foreach ( $providers as $provider ) {
+					$provider_options[ $provider->get_key() ] = $provider->get_label();
+				}
+
+				$renderer->field(
+					[
+						'label'       => __( 'Aanbieder', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'key'         => 'provider',
+						'type'        => 'select',
+						'options'     => $provider_options,
+						'attributes'  => [
+							'id' => 'groq-ai-provider',
+						],
+						'description' => __( 'Selecteer welke aanbieder de product- en termteksten schrijft.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					]
+				);
+
+				$renderer->field(
+					[
+						'label'    => __( 'Model', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'key'      => 'model',
+						'renderer' => [ $this, 'render_model_select_field' ],
+						'attributes' => [
+							'id' => 'groq-ai-model-select',
+						],
+					]
+				);
+
+				foreach ( $providers as $provider ) {
+					$provider_key   = $provider->get_key();
+					$option_field   = $provider->get_option_key();
+					$renderer->field(
+						[
+							'label'          => __( 'API-sleutel', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+							'key'            => $option_field,
+							'type'           => 'password',
+							'attributes'     => [
+								'id'           => 'groq-ai-api-' . $provider_key,
+								'class'        => 'regular-text',
+								'autocomplete' => 'off',
+							],
+							'row_attributes' => [
+								'id'                => 'groq_ai_api_key_' . $provider_key,
+								'data-provider-row' => $provider_key,
+							],
+							'description'    => sprintf( esc_html__( 'Voer de API-sleutel in voor %s.', GROQ_AI_PRODUCT_TEXT_DOMAIN ), esc_html( $provider->get_label() ) ),
+							'renderer'       => [ $this, 'render_provider_api_key_field' ],
+							'provider_key'   => $provider_key,
+							'google_safety_categories' => $google_safety_categories,
+							'google_safety_thresholds' => $google_safety_thresholds,
+							'google_safety_settings'   => $google_safety_settings,
+						]
+					);
+				}
+
+				$renderer->close_table();
+				?>
 				<h2><?php esc_html_e( 'Algemene instellingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row"><label for="groq-ai-max-output"><?php esc_html_e( 'Maximale output tokens', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
-						<td>
-							<input type="number" id="groq-ai-max-output" name="<?php echo esc_attr( $option_key ); ?>[max_output_tokens]" value="<?php echo esc_attr( isset( $settings['max_output_tokens'] ) ? (int) $settings['max_output_tokens'] : 2048 ); ?>" min="128" max="8192" />
-							<p class="description"><?php esc_html_e( 'Limitering van het aantal tokens per output voor compatibiliteit met verschillende modellen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="groq-ai-term-bottom-meta"><?php esc_html_e( 'Term meta key (onderste tekst)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
-						<td>
-							<input type="text" id="groq-ai-term-bottom-meta" class="regular-text" name="<?php echo esc_attr( $option_key ); ?>[term_bottom_description_meta_key]" value="<?php echo esc_attr( isset( $settings['term_bottom_description_meta_key'] ) ? $settings['term_bottom_description_meta_key'] : '' ); ?>" />
-							<p class="description"><?php esc_html_e( 'Optioneel: overschrijf in welke term meta key de onderste omschrijving moet landen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><?php esc_html_e( 'Response format fallback', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-						<td>
-							<?php $this->render_response_format_compat_field(); ?>
-						</td>
-					</tr>
-				</table>
+				<?php
+				$renderer->open_table();
+				$renderer->field(
+					[
+						'label'       => __( 'Maximale output tokens', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'key'         => 'max_output_tokens',
+						'type'        => 'number',
+						'attributes'  => [
+							'min' => 128,
+							'max' => 8192,
+						],
+						'description' => __( 'Limitering van het aantal tokens per output voor compatibiliteit met verschillende modellen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					]
+				);
+				$renderer->field(
+					[
+						'label'       => __( 'Term meta key (onderste tekst)', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'key'         => 'term_bottom_description_meta_key',
+						'placeholder' => 'groq_ai_term_bottom_description',
+						'description' => __( 'Optioneel: overschrijf in welke term meta key de onderste omschrijving moet landen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					]
+				);
+				$renderer->field(
+					[
+						'label'    => __( 'Response format fallback', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'renderer' => function ( $field, $renderer ) {
+							$this->render_response_format_compat_field();
+						},
+					]
+				);
+				$renderer->close_table();
+				?>
+
 				<h2><?php esc_html_e( 'Google Search Console & Analytics', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row"><label for="groq-ai-google-client-id"><?php esc_html_e( 'Google OAuth client ID', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
-						<td>
-							<input type="text" id="groq-ai-google-client-id" class="regular-text" name="<?php echo esc_attr( $option_key ); ?>[google_oauth_client_id]" value="<?php echo esc_attr( isset( $settings['google_oauth_client_id'] ) ? $settings['google_oauth_client_id'] : '' ); ?>" autocomplete="off" />
-							<p class="description">
-								<?php
-								printf(
-									esc_html__( 'Stel deze plugin in als OAuth-client in Google Cloud Console en gebruik onderstaande redirect-URL.', GROQ_AI_PRODUCT_TEXT_DOMAIN )
-								);
-								?>
-							</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="groq-ai-google-client-secret"><?php esc_html_e( 'Google OAuth client secret', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
-						<td>
-							<input type="password" id="groq-ai-google-client-secret" class="regular-text" name="<?php echo esc_attr( $option_key ); ?>[google_oauth_client_secret]" value="<?php echo esc_attr( isset( $settings['google_oauth_client_secret'] ) ? $settings['google_oauth_client_secret'] : '' ); ?>" autocomplete="off" />
-							<p class="description">
-								<?php esc_html_e( 'Redirect URI voor OAuth (voeg exact zo toe in Google Cloud → Credentials):', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?><br />
-								<code><?php echo esc_html( $oauth_redirect ); ?></code>
-							</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><?php esc_html_e( 'Search Console koppeling', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-						<td>
-							<label>
-								<input type="checkbox" name="<?php echo esc_attr( $option_key ); ?>[google_enable_gsc]" value="1" <?php checked( ! empty( $settings['google_enable_gsc'] ) ); ?> />
-								<?php esc_html_e( 'Search Console data gebruiken in term prompts', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
-							</label>
-							<p>
-								<input type="url" class="regular-text" name="<?php echo esc_attr( $option_key ); ?>[google_gsc_site_url]" value="<?php echo esc_attr( isset( $settings['google_gsc_site_url'] ) ? $settings['google_gsc_site_url'] : '' ); ?>" placeholder="sc-domain:voorbeeld.nl" />
-							</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><?php esc_html_e( 'Analytics koppeling', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-						<td>
-							<label>
-								<input type="checkbox" name="<?php echo esc_attr( $option_key ); ?>[google_enable_ga]" value="1" <?php checked( ! empty( $settings['google_enable_ga'] ) ); ?> />
-								<?php esc_html_e( 'GA4 data meesturen (landing page statistieken)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
-							</label>
-							<p>
-								<input type="text" class="regular-text" name="<?php echo esc_attr( $option_key ); ?>[google_ga4_property_id]" value="<?php echo esc_attr( isset( $settings['google_ga4_property_id'] ) ? $settings['google_ga4_property_id'] : '' ); ?>" placeholder="properties/123456789" />
-							</p>
-						</td>
-					</tr>
-				</table>
+				<?php
+				$renderer->open_table();
+				$renderer->field(
+					[
+						'label'       => __( 'Google OAuth client ID', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'key'         => 'google_oauth_client_id',
+						'attributes'  => [ 'autocomplete' => 'off' ],
+						'description' => __( 'Stel deze plugin in als OAuth-client in Google Cloud Console en gebruik onderstaande redirect-URL.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					]
+				);
+				$renderer->field(
+					[
+						'label'      => __( 'Google OAuth client secret', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'key'        => 'google_oauth_client_secret',
+						'type'       => 'password',
+						'attributes' => [ 'autocomplete' => 'off' ],
+						'description' => sprintf(
+							'%s<br /><code>%s</code>',
+							esc_html__( 'Redirect URI voor OAuth (voeg exact zo toe in Google Cloud → Credentials):', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+							esc_html( $oauth_redirect )
+						),
+					]
+				);
+				$renderer->field(
+					[
+						'label'          => __( 'Search Console koppeling', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'type'           => 'checkbox',
+						'key'            => 'google_enable_gsc',
+						'checkbox_label' => __( 'Search Console data gebruiken in term prompts', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'renderer'       => function ( $field, $renderer ) use ( $option_key, $settings ) {
+							$value = ! empty( $settings['google_gsc_site_url'] ) ? $settings['google_gsc_site_url'] : '';
+							printf(
+								'<p><input type="url" class="regular-text" name="%1$s[google_gsc_site_url]" value="%2$s" placeholder="sc-domain:voorbeeld.nl" /></p>',
+								esc_attr( $option_key ),
+								esc_attr( $value )
+							);
+						},
+					]
+				);
+				$renderer->field(
+					[
+						'label'          => __( 'Analytics koppeling', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'type'           => 'checkbox',
+						'key'            => 'google_enable_ga',
+						'checkbox_label' => __( 'GA4 data meesturen (landing page statistieken)', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'renderer'       => function ( $field, $renderer ) use ( $option_key, $settings ) {
+							$value = ! empty( $settings['google_ga4_property_id'] ) ? $settings['google_ga4_property_id'] : '';
+							printf(
+								'<p><input type="text" class="regular-text" name="%1$s[google_ga4_property_id]" value="%2$s" placeholder="properties/123456789" /></p>',
+								esc_attr( $option_key ),
+								esc_attr( $value )
+							);
+						},
+					]
+				);
+				$renderer->close_table();
+				?>
 				<p class="submit"><?php submit_button( __( 'Instellingen opslaan', GROQ_AI_PRODUCT_TEXT_DOMAIN ), 'primary', 'submit', false ); ?></p>
 			</form>
 			<div style="margin-top:24px; padding:16px; border:1px solid #dcdcde; background:#fff;">
@@ -458,325 +393,6 @@ class Groq_AI_Product_Text_Settings_Page {
 		<?php
 	}
 
-	private function count_words( $text ) {
-		$text = wp_strip_all_tags( (string) $text );
-		$text = trim( preg_replace( '/\s+/u', ' ', $text ) );
-		if ( '' === $text ) {
-			return 0;
-		}
-		if ( preg_match_all( '/\pL[\pL\pN\']*/u', $text, $matches ) ) {
-			return count( $matches[0] );
-		}
-		return 0;
-	}
-
-	private function detect_brand_taxonomy() {
-		if ( null !== $this->brand_taxonomy ) {
-			return $this->brand_taxonomy;
-		}
-
-		$candidates = [
-			'product_brand',
-			'pwb-brand',
-			'yith_product_brand',
-			'berocket_brand',
-		];
-
-		// Attribute-taxonomy fallback (vaak pa_brand).
-		if ( taxonomy_exists( 'pa_brand' ) ) {
-			array_unshift( $candidates, 'pa_brand' );
-		}
-
-		$candidates = apply_filters( 'groq_ai_brand_taxonomy_candidates', $candidates );
-		$found = '';
-		foreach ( $candidates as $tax ) {
-			$tax = sanitize_key( (string) $tax );
-			if ( $tax && taxonomy_exists( $tax ) ) {
-				$found = $tax;
-				break;
-			}
-		}
-
-		$found = apply_filters( 'groq_ai_brand_taxonomy', $found );
-		$this->brand_taxonomy = sanitize_key( (string) $found );
-		return $this->brand_taxonomy;
-	}
-
-	private function get_term_page_url( $taxonomy, $term_id ) {
-		return add_query_arg(
-			[
-				'page' => 'groq-ai-product-text-term',
-				'taxonomy' => sanitize_key( (string) $taxonomy ),
-				'term_id' => absint( $term_id ),
-			],
-			admin_url( 'options-general.php' )
-		);
-	}
-
-	private function get_term_overview_data( $taxonomy ) {
-		$taxonomy = sanitize_key( (string) $taxonomy );
-
-		if ( isset( $this->term_overview_cache[ $taxonomy ] ) ) {
-			return $this->term_overview_cache[ $taxonomy ];
-		}
-
-		$rows = [];
-		$empty_rows = [];
-
-		if ( '' !== $taxonomy && taxonomy_exists( $taxonomy ) ) {
-			$terms = get_terms(
-				[
-					'taxonomy'   => $taxonomy,
-					'hide_empty' => false,
-					'orderby'    => 'name',
-					'order'      => 'ASC',
-					'number'     => 0,
-				]
-			);
-
-			if ( is_wp_error( $terms ) ) {
-				$terms = [];
-			}
-
-			foreach ( $terms as $term ) {
-				if ( ! $term || ! is_object( $term ) || empty( $term->term_id ) ) {
-					continue;
-				}
-
-				$words           = $this->count_words( isset( $term->description ) ? $term->description : '' );
-				$has_description = $words > 0;
-
-				$row = [
-					'id'              => absint( $term->term_id ),
-					'name'            => (string) $term->name,
-					'slug'            => (string) $term->slug,
-					'count'           => isset( $term->count ) ? absint( $term->count ) : 0,
-					'words'           => $words,
-					'has_description' => $has_description,
-					'url'             => $this->get_term_page_url( $taxonomy, $term->term_id ),
-				];
-
-				$rows[] = $row;
-				if ( ! $has_description ) {
-					$empty_rows[] = $row;
-				}
-			}
-		}
-
-		$data = [
-			'rows'        => $rows,
-			'empty_rows'  => $empty_rows,
-			'empty_count' => count( $empty_rows ),
-		];
-
-		$this->term_overview_cache[ $taxonomy ] = $data;
-
-		return $data;
-	}
-
-	private function render_term_bulk_panel( $label_plural, $empty_count ) {
-		$label_plural = (string) $label_plural;
-		?>
-		<div class="groq-ai-bulk-panel">
-			<p>
-				<?php
-				if ( $empty_count > 0 ) {
-					printf(
-						/* translators: 1: amount, 2: label plural (e.g. categorieën) */
-						esc_html__( 'Er zijn %1$d %2$s zonder omschrijving. Klik op de knop hieronder om automatisch teksten te genereren.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-						(int) $empty_count,
-						esc_html( $label_plural )
-					);
-				} else {
-					printf(
-						esc_html__( 'Alle %s hebben al een omschrijving.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-						esc_html( $label_plural )
-					);
-				}
-				?>
-			</p>
-			<p class="groq-ai-bulk-actions">
-				<?php
-				$button_label = sprintf(
-					esc_html__( 'Genereer teksten voor lege %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-					$label_plural
-				);
-				?>
-				<button type="button" class="button button-primary" id="groq-ai-bulk-generate"><?php echo esc_html( $button_label ); ?></button>
-				<button type="button" class="button" id="groq-ai-bulk-cancel" hidden><?php esc_html_e( 'Stop bulk generatie', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
-			</p>
-			<div id="groq-ai-bulk-status" class="description"></div>
-			<ol id="groq-ai-bulk-log" class="groq-ai-bulk-log"></ol>
-		</div>
-		<?php
-	}
-
-	private function localize_term_bulk_script( $taxonomy, $overrides = [] ) {
-		$overview = $this->get_term_overview_data( $taxonomy );
-		$rows     = isset( $overview['rows'] ) ? $overview['rows'] : [];
-
-		$terms = [];
-		foreach ( $rows as $row ) {
-			$terms[] = [
-				'id'              => isset( $row['id'] ) ? (int) $row['id'] : 0,
-				'name'            => isset( $row['name'] ) ? (string) $row['name'] : '',
-				'slug'            => isset( $row['slug'] ) ? (string) $row['slug'] : '',
-				'count'           => isset( $row['count'] ) ? (int) $row['count'] : 0,
-				'words'           => isset( $row['words'] ) ? (int) $row['words'] : 0,
-				'hasDescription'  => ! empty( $row['has_description'] ),
-			];
-		}
-
-		$defaults = [
-			'ajaxUrl'         => admin_url( 'admin-ajax.php' ),
-			'nonce'           => wp_create_nonce( 'groq_ai_bulk_generate_terms' ),
-			'taxonomy'        => $taxonomy,
-			'terms'           => $terms,
-			'allowRegenerate' => false,
-			'strings'         => [],
-		];
-
-		$config = wp_parse_args( $overrides, $defaults );
-
-		wp_localize_script( 'groq-ai-term-bulk', 'GroqAITermBulk', $config );
-	}
-
-	public function render_categories_overview_page() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-
-		$taxonomy    = 'product_cat';
-		$overview    = $this->get_term_overview_data( $taxonomy );
-		$rows        = isset( $overview['rows'] ) ? $overview['rows'] : [];
-		$empty_count = isset( $overview['empty_count'] ) ? (int) $overview['empty_count'] : 0;
-		?>
-		<div class="wrap">
-			<h1><?php esc_html_e( 'Categorie teksten', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
-			<p><?php esc_html_e( 'Klik op een categorie om teksten te genereren en instellingen te beheren. De tabel toont de huidige woordlengte van de categorie-omschrijving.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
-			<?php $this->render_term_bulk_panel( __( 'categorieën', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $empty_count ); ?>
-			<table class="widefat striped">
-				<thead>
-					<tr>
-						<th><?php esc_html_e( 'Categorie', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-						<th><?php esc_html_e( 'Slug', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-						<th><?php esc_html_e( 'Producten', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-						<th><?php esc_html_e( 'Woorden (omschrijving)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-						<th><?php esc_html_e( 'Acties', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-					</tr>
-				</thead>
-				<tbody>
-				<?php if ( empty( $rows ) ) : ?>
-					<tr><td colspan="5"><?php esc_html_e( 'Geen categorieën gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></td></tr>
-				<?php else : ?>
-					<?php foreach ( $rows as $row ) : ?>
-						<?php
-							$row_classes = [ 'groq-ai-term-row' ];
-							if ( empty( $row['has_description'] ) ) {
-								$row_classes[] = 'groq-ai-term-missing';
-							}
-							$link  = isset( $row['url'] ) ? $row['url'] : '';
-							$count = isset( $row['count'] ) ? (int) $row['count'] : 0;
-							$words = isset( $row['words'] ) ? (int) $row['words'] : 0;
-						?>
-						<tr class="<?php echo esc_attr( implode( ' ', $row_classes ) ); ?>" data-groq-ai-term-id="<?php echo esc_attr( isset( $row['id'] ) ? (string) $row['id'] : '' ); ?>">
-							<td>
-								<a href="<?php echo esc_url( $link ); ?>"><strong><?php echo esc_html( isset( $row['name'] ) ? $row['name'] : '' ); ?></strong></a>
-							</td>
-							<td><?php echo esc_html( isset( $row['slug'] ) ? $row['slug'] : '' ); ?></td>
-							<td><?php echo esc_html( (string) $count ); ?></td>
-							<td class="groq-ai-word-cell"><span class="groq-ai-word-count"><?php echo esc_html( (string) $words ); ?></span></td>
-							<td class="groq-ai-term-actions">
-								<button type="button" class="button button-secondary groq-ai-regenerate-term" data-term-id="<?php echo esc_attr( isset( $row['id'] ) ? (string) $row['id'] : '' ); ?>">
-									<?php esc_html_e( 'Genereer opnieuw', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
-								</button>
-							</td>
-						</tr>
-					<?php endforeach; ?>
-				<?php endif; ?>
-				</tbody>
-			</table>
-		</div>
-		<?php
-	}
-	public function render_brands_overview_page() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-
-		$taxonomy = $this->detect_brand_taxonomy();
-		if ( '' === $taxonomy ) {
-			?>
-			<div class="wrap">
-				<h1><?php esc_html_e( 'Merk teksten', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
-				<p><?php esc_html_e( 'Geen merk-taxonomie gevonden. Installeer/activeer een merken-plugin of stel een taxonomie in via de filter groq_ai_brand_taxonomy.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
-			</div>
-			<?php
-			return;
-		}
-
-		$overview    = $this->get_term_overview_data( $taxonomy );
-		$rows        = isset( $overview['rows'] ) ? $overview['rows'] : [];
-		$empty_count = isset( $overview['empty_count'] ) ? (int) $overview['empty_count'] : 0;
-		?>
-		<div class="wrap">
-			<h1><?php esc_html_e( 'Merk teksten', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
-			<p>
-				<?php
-				printf(
-					/* translators: %s: taxonomy key */
-					esc_html__( 'Gedetecteerde merk-taxonomie: %s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-					esc_html( $taxonomy )
-				);
-				?>
-			</p>
-			<?php $this->render_term_bulk_panel( __( 'merken', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $empty_count ); ?>
-			<p class="description"><?php esc_html_e( 'Gebruik de knop "Genereer opnieuw" in de tabel om bestaande merkteksten opnieuw laten schrijven.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
-			<table class="widefat striped">
-				<thead>
-					<tr>
-						<th><?php esc_html_e( 'Merk', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-						<th><?php esc_html_e( 'Slug', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-						<th><?php esc_html_e( 'Producten', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-						<th><?php esc_html_e( 'Woorden (omschrijving)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-						<th><?php esc_html_e( 'Acties', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-					</tr>
-				</thead>
-				<tbody>
-				<?php if ( empty( $rows ) ) : ?>
-					<tr><td colspan="5"><?php esc_html_e( 'Geen merken gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></td></tr>
-				<?php else : ?>
-					<?php foreach ( $rows as $row ) : ?>
-						<?php
-							$row_classes = [ 'groq-ai-term-row' ];
-							if ( empty( $row['has_description'] ) ) {
-								$row_classes[] = 'groq-ai-term-missing';
-							}
-							$link  = isset( $row['url'] ) ? $row['url'] : '';
-							$count = isset( $row['count'] ) ? (int) $row['count'] : 0;
-							$words = isset( $row['words'] ) ? (int) $row['words'] : 0;
-						?>
-						<tr class="<?php echo esc_attr( implode( ' ', $row_classes ) ); ?>" data-groq-ai-term-id="<?php echo esc_attr( isset( $row['id'] ) ? (string) $row['id'] : '' ); ?>">
-							<td>
-								<a href="<?php echo esc_url( $link ); ?>"><strong><?php echo esc_html( isset( $row['name'] ) ? $row['name'] : '' ); ?></strong></a>
-							</td>
-							<td><?php echo esc_html( isset( $row['slug'] ) ? $row['slug'] : '' ); ?></td>
-							<td><?php echo esc_html( (string) $count ); ?></td>
-							<td class="groq-ai-word-cell"><span class="groq-ai-word-count"><?php echo esc_html( (string) $words ); ?></span></td>
-							<td class="groq-ai-term-actions">
-								<button type="button" class="button button-secondary groq-ai-regenerate-term" data-term-id="<?php echo esc_attr( isset( $row['id'] ) ? (string) $row['id'] : '' ); ?>">
-									<?php esc_html_e( 'Genereer opnieuw', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
-								</button>
-							</td>
-						</tr>
-					<?php endforeach; ?>
-				<?php endif; ?>
-				</tbody>
-			</table>
-		</div>
-		<?php
-	}
-
 	public function render_modules_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
@@ -801,157 +417,6 @@ class Groq_AI_Product_Text_Settings_Page {
 		</div>
 		<?php
 	}
-
-	public function render_logs_page() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-
-		$logs_table = new Groq_AI_Logs_Table( $this->plugin );
-		$logs_table->prepare_items();
-		?>
-		<div class="wrap">
-			<h1><?php esc_html_e( 'AI-logboek', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
-			<form method="get">
-				<input type="hidden" name="page" value="groq-ai-product-text-logs" />
-				<?php $logs_table->search_box( __( 'Zoek logboek', GROQ_AI_PRODUCT_TEXT_DOMAIN ), 'groq-ai-logs' ); ?>
-				<?php $logs_table->display(); ?>
-			</form>
-		</div>
-		<?php
-	}
-
-	public function render_log_detail_page() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-
-		$log_id   = isset( $_GET['log_id'] ) ? absint( $_GET['log_id'] ) : 0;
-		$back_url = $this->get_page_url( 'groq-ai-product-text-logs' );
-		$log      = null;
-
-		if ( $log_id ) {
-			global $wpdb;
-			$table = $wpdb->prefix . 'groq_ai_generation_logs';
-			$query = $wpdb->prepare(
-				"SELECT l.*, p.post_title FROM {$table} l LEFT JOIN {$wpdb->posts} p ON p.ID = l.post_id WHERE l.id = %d",
-				$log_id
-			);
-			$log = $wpdb->get_row( $query, ARRAY_A );
-		}
-
-		?>
-		<div class="wrap">
-			<h1><?php esc_html_e( 'Logdetail', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
-			<p>
-				<a href="<?php echo esc_url( $back_url ); ?>" class="button">&larr; <?php esc_html_e( 'Terug naar logboek', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></a>
-			</p>
-			<?php if ( ! $log ) : ?>
-				<p><?php esc_html_e( 'Log niet gevonden of verwijderd.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
-			<?php else : ?>
-				<table class="widefat striped" style="margin-top:16px;">
-					<tbody>
-						<tr>
-							<th><?php esc_html_e( 'Datum', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-							<td><?php echo esc_html( mysql2date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $log['created_at'] ) ); ?></td>
-						</tr>
-						<tr>
-							<th><?php esc_html_e( 'Gebruiker', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-							<td>
-								<?php
-								if ( $log['user_id'] ) {
-									$user = get_userdata( $log['user_id'] );
-									echo $user ? esc_html( $user->display_name ) : esc_html( (string) $log['user_id'] );
-								} else {
-									echo '—';
-								}
-								?>
-							</td>
-						</tr>
-						<tr>
-							<th><?php esc_html_e( 'Product', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-							<td>
-								<?php
-								if ( $log['post_id'] ) {
-									$link = get_edit_post_link( $log['post_id'] );
-									$title = $log['post_title'] ? $log['post_title'] : sprintf( __( 'Product #%d', GROQ_AI_PRODUCT_TEXT_DOMAIN ), (int) $log['post_id'] );
-									echo $link ? '<a href="' . esc_url( $link ) . '">' . esc_html( $title ) . '</a>' : esc_html( $title );
-								} else {
-									echo '—';
-								}
-								?>
-							</td>
-						</tr>
-						<tr>
-							<th><?php esc_html_e( 'Provider', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-							<td><?php echo esc_html( $log['provider'] ); ?></td>
-						</tr>
-						<tr>
-							<th><?php esc_html_e( 'Model', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-							<td><?php echo esc_html( $log['model'] ); ?></td>
-						</tr>
-						<tr>
-							<th><?php esc_html_e( 'Status', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-							<td><?php echo esc_html( $log['status'] ); ?></td>
-						</tr>
-						<tr>
-							<th><?php esc_html_e( 'Tokens', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-							<td>
-								<?php
-								printf(
-									esc_html__( 'Prompt: %1$s — Completion: %2$s — Totaal: %3$s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-									isset( $log['tokens_prompt'] ) ? number_format_i18n( (int) $log['tokens_prompt'] ) : '—',
-									isset( $log['tokens_completion'] ) ? number_format_i18n( (int) $log['tokens_completion'] ) : '—',
-									isset( $log['tokens_total'] ) ? number_format_i18n( (int) $log['tokens_total'] ) : '—'
-								);
-								?>
-							</td>
-						</tr>
-						<tr>
-							<th><?php esc_html_e( 'Foutmelding', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-							<td><?php echo $log['error_message'] ? esc_html( $log['error_message'] ) : '—'; ?></td>
-						</tr>
-					</tbody>
-				</table>
-
-				<h2><?php esc_html_e( 'Prompt', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
-				<pre style="background:#fff;border:1px solid #dcdcde;padding:12px;white-space:pre-wrap;"><?php echo esc_html( $log['prompt'] ); ?></pre>
-
-				<h2><?php esc_html_e( 'AI-respons', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
-				<pre style="background:#f9f9f9;border:1px solid #dcdcde;padding:12px;white-space:pre-wrap;"><?php echo esc_html( $log['response'] ); ?></pre>
-
-				<?php
-				$request_params = [];
-				if ( ! empty( $log['request_json'] ) ) {
-					$request_params = json_decode( $log['request_json'], true );
-					$request_params = is_array( $request_params ) ? $request_params : [];
-				}
-				if ( ! empty( $request_params ) ) :
-					$request_pretty = wp_json_encode( $request_params, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
-					$request_pretty = $request_pretty ? $request_pretty : wp_json_encode( $request_params );
-					?>
-					<h2><?php esc_html_e( 'Request parameters', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
-					<pre style="background:#fff;border:1px solid #dcdcde;padding:12px;white-space:pre-wrap;"><?php echo esc_html( $request_pretty ); ?></pre>
-				<?php endif; ?>
-
-				<?php
-				$usage_meta = [];
-				if ( ! empty( $log['usage_json'] ) ) {
-					$usage_meta = json_decode( $log['usage_json'], true );
-					$usage_meta = is_array( $usage_meta ) ? $usage_meta : [];
-				}
-				if ( ! empty( $usage_meta ) ) :
-					$usage_pretty = wp_json_encode( $usage_meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
-					$usage_pretty = $usage_pretty ? $usage_pretty : wp_json_encode( $usage_meta );
-					?>
-					<h2><?php esc_html_e( 'Usage metadata', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
-					<pre style="background:#f6f7f7;border:1px solid #dcdcde;padding:12px;white-space:pre-wrap;"><?php echo esc_html( $usage_pretty ); ?></pre>
-				<?php endif; ?>
-			<?php endif; ?>
-		</div>
-		<?php
-	}
-
 	public function render_prompt_settings_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
@@ -1055,251 +520,6 @@ class Groq_AI_Product_Text_Settings_Page {
 		<?php
 	}
 
-	public function render_term_generator_page() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-
-		$taxonomy = isset( $_GET['taxonomy'] ) ? sanitize_key( wp_unslash( $_GET['taxonomy'] ) ) : '';
-		$term_id  = isset( $_GET['term_id'] ) ? absint( $_GET['term_id'] ) : 0;
-
-		if ( '' === $taxonomy || ! taxonomy_exists( $taxonomy ) || ! $term_id ) {
-			?>
-			<div class="wrap">
-				<h1><?php esc_html_e( 'Term tekst', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
-				<p><?php esc_html_e( 'Ongeldige term.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
-			</div>
-			<?php
-			return;
-		}
-
-		$term = get_term( $term_id, $taxonomy );
-		if ( ! $term || is_wp_error( $term ) ) {
-			?>
-			<div class="wrap">
-				<h1><?php esc_html_e( 'Term tekst', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
-				<p><?php esc_html_e( 'Term niet gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
-			</div>
-			<?php
-			return;
-		}
-
-		$term_notice         = isset( $_GET['groq_ai_term_notice'] ) ? sanitize_key( wp_unslash( $_GET['groq_ai_term_notice'] ) ) : '';
-		$term_notice_status  = isset( $_GET['groq_ai_term_status'] ) ? sanitize_key( wp_unslash( $_GET['groq_ai_term_status'] ) ) : 'success';
-		$term_notice_message = '';
-		if ( isset( $_GET['groq_ai_term_notice_message'] ) ) {
-			$term_notice_message = sanitize_text_field( rawurldecode( wp_unslash( $_GET['groq_ai_term_notice_message'] ) ) );
-		}
-		if ( $term_notice && '' === $term_notice_message ) {
-			if ( 'saved' === $term_notice ) {
-				$term_notice_message = __( 'Term succesvol opgeslagen.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
-			} else {
-				$term_notice_message = __( 'Actie voltooid.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
-			}
-		}
-
-		$term_label = ( 'product_cat' === $taxonomy ) ? __( 'Categorie', GROQ_AI_PRODUCT_TEXT_DOMAIN ) : __( 'Term', GROQ_AI_PRODUCT_TEXT_DOMAIN );
-		$word_count = $this->count_words( $term->description );
-		$meta_prompt = get_term_meta( $term_id, 'groq_ai_term_custom_prompt', true );
-		$settings = $this->plugin->get_settings();
-		$bottom_meta_key = $this->resolve_term_bottom_description_meta_key( $term, $settings );
-		$effective_bottom_meta_key = '' !== $bottom_meta_key ? $bottom_meta_key : 'groq_ai_term_bottom_description';
-		$bottom_description = (string) get_term_meta( $term_id, $effective_bottom_meta_key, true );
-		$rankmath_module_enabled = $this->plugin->is_module_enabled( 'rankmath', $settings );
-		$rankmath_active = $this->plugin->is_rankmath_active();
-		$rankmath_title = '';
-		$rankmath_description = '';
-		$rankmath_focus_keywords = '';
-		if ( $rankmath_module_enabled ) {
-			$rankmath_keys = $this->resolve_rankmath_term_meta_keys( $term, $settings );
-			$rankmath_title = (string) get_term_meta( $term_id, $rankmath_keys['title'], true );
-			$rankmath_description = (string) get_term_meta( $term_id, $rankmath_keys['description'], true );
-			$rankmath_focus_keywords = (string) get_term_meta( $term_id, $rankmath_keys['focus_keyword'], true );
-		}
-		$default_prompt = $this->get_term_prompt_text( $term, $meta_prompt );
-		?>
-		<div class="wrap">
-			<h1>
-				<?php echo esc_html( $term_label ); ?>: <?php echo esc_html( $term->name ); ?>
-			</h1>
-			<?php if ( $term_notice ) : ?>
-				<?php $notice_class = ( 'error' === $term_notice_status ) ? 'notice notice-error' : 'notice notice-success'; ?>
-				<div class="<?php echo esc_attr( $notice_class ); ?>">
-					<p><?php echo esc_html( $term_notice_message ); ?></p>
-				</div>
-			<?php endif; ?>
-			<p>
-				<?php
-				printf(
-					/* translators: 1: taxonomy key, 2: term id, 3: word count */
-					esc_html__( 'Taxonomie: %1$s — Term ID: %2$d — Huidige omschrijving: %3$d woorden', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-					esc_html( $taxonomy ),
-					(int) $term_id,
-					(int) $word_count
-				);
-				?>
-			</p>
-
-			<h2><?php esc_html_e( 'Omschrijving bewerken', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'groq_ai_save_term_content', '_wpnonce' ); ?>
-				<input type="hidden" name="action" value="groq_ai_save_term_content" />
-				<input type="hidden" name="taxonomy" value="<?php echo esc_attr( $taxonomy ); ?>" />
-				<input type="hidden" name="term_id" value="<?php echo esc_attr( (string) $term_id ); ?>" />
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row"><label for="description"><?php esc_html_e( 'Omschrijving', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
-						<td>
-							<textarea name="description" id="description" rows="8" class="large-text"><?php echo esc_textarea( (string) $term->description ); ?></textarea>
-							<p class="description"><?php esc_html_e( 'Dit is de standaard WordPress term-omschrijving (wordt o.a. gebruikt op categorie/merk pagina’s).', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="groq-ai-term-bottom-description"><?php esc_html_e( 'Omschrijving (onderaan)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
-						<td>
-							<textarea name="groq_ai_term_bottom_description" id="groq-ai-term-bottom-description" rows="8" class="large-text"><?php echo esc_textarea( (string) $bottom_description ); ?></textarea>
-							<p class="description">
-								<?php
-									printf(
-										/* translators: %s: meta key */
-										esc_html__( 'Deze tekst wordt opgeslagen in term meta (%s) en is bedoeld voor helemaal onderaan (LiveBetter customfields).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-										esc_html( $effective_bottom_meta_key )
-									);
-									if ( '' === $bottom_meta_key ) {
-										echo ' ' . esc_html__( 'Let op: stel de juiste LiveBetter meta key in via de plugin-instelling of via de filter groq_ai_term_bottom_description_meta_key.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
-									}
-								?>
-							</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="groq-ai-term-custom-prompt"><?php esc_html_e( 'Prompt (optioneel, per term)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
-						<td>
-							<textarea name="groq_ai_term_custom_prompt" id="groq-ai-term-custom-prompt" rows="4" class="large-text"><?php echo esc_textarea( (string) $meta_prompt ); ?></textarea>
-							<p class="description"><?php esc_html_e( 'Laat leeg om de standaard prompt te gebruiken. Deze prompt wordt gebruikt wanneer je op de knop "Genereer" klikt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
-						</td>
-					</tr>
-					<?php if ( $rankmath_module_enabled ) : ?>
-						<?php if ( ! $rankmath_active ) : ?>
-							<tr>
-								<th scope="row"><?php esc_html_e( 'Rank Math', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-								<td>
-									<p class="description"><?php esc_html_e( 'Rank Math plugin lijkt niet actief. Velden zijn wel invulbaar en worden opgeslagen in term meta, maar Rank Math gebruikt ze pas na activatie.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
-								</td>
-							</tr>
-						<?php endif; ?>
-						<tr>
-							<th scope="row"><label for="groq-ai-rankmath-title"><?php esc_html_e( 'Rank Math meta title', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
-							<td>
-								<textarea name="groq_ai_rankmath_meta_title" id="groq-ai-rankmath-title" rows="2" class="large-text"><?php echo esc_textarea( (string) $rankmath_title ); ?></textarea>
-							</td>
-						</tr>
-						<tr>
-							<th scope="row"><label for="groq-ai-rankmath-description"><?php esc_html_e( 'Rank Math meta description', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
-							<td>
-								<textarea name="groq_ai_rankmath_meta_description" id="groq-ai-rankmath-description" rows="3" class="large-text"><?php echo esc_textarea( (string) $rankmath_description ); ?></textarea>
-							</td>
-						</tr>
-						<tr>
-							<th scope="row"><label for="groq-ai-rankmath-keywords"><?php esc_html_e( 'Rank Math focus keywords', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></label></th>
-							<td>
-								<textarea name="groq_ai_rankmath_focus_keywords" id="groq-ai-rankmath-keywords" rows="2" class="large-text" placeholder="<?php esc_attr_e( 'bijv. luxe massage apparaat, wellness cadeau', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>"><?php echo esc_textarea( (string) $rankmath_focus_keywords ); ?></textarea>
-							</td>
-						</tr>
-					<?php endif; ?>
-				</table>
-				<?php submit_button( __( 'Opslaan', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ); ?>
-			</form>
-
-			<hr />
-
-			<h2><?php esc_html_e( 'Tekst genereren', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
-			<form id="groq-ai-term-form">
-				<p class="description"><?php esc_html_e( 'De AI gebruikt de winkelcontext + termcontext (o.a. top-verkopers in deze categorie/dit merk). Later voegen we Search Console/Analytics context toe.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
-				<p>
-					<label>
-						<input type="checkbox" id="groq-ai-term-include-top-products" checked />
-						<?php esc_html_e( 'Top producten meenemen', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
-					</label>
-					&nbsp;
-					<label>
-						<?php esc_html_e( 'Aantal:', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
-						<input type="number" id="groq-ai-term-top-products-limit" value="10" min="1" max="25" style="width:80px;" />
-					</label>
-				</p>
-				<textarea id="groq-ai-term-prompt" class="large-text" rows="5"><?php echo esc_textarea( $default_prompt ); ?></textarea>
-				<p>
-					<button type="submit" class="button button-primary"><?php esc_html_e( 'Genereer', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
-					<button type="button" class="button" id="groq-ai-term-apply"><?php esc_html_e( 'Zet in velden', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
-				</p>
-				<div id="groq-ai-term-status" class="description" aria-live="polite"></div>
-				<h3><?php esc_html_e( 'Gegenereerde tekst (omschrijving, 1 alinea)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h3>
-				<textarea id="groq-ai-term-generated-top" class="large-text" rows="6"></textarea>
-				<h3><?php esc_html_e( 'Gegenereerde tekst (onderaan)', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h3>
-				<textarea id="groq-ai-term-generated-bottom" class="large-text" rows="10"></textarea>
-				<?php if ( $rankmath_module_enabled ) : ?>
-					<h3><?php esc_html_e( 'Gegenereerde Rank Math meta title', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h3>
-					<textarea id="groq-ai-term-generated-meta-title" class="large-text" rows="2"></textarea>
-					<h3><?php esc_html_e( 'Gegenereerde Rank Math meta description', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h3>
-					<textarea id="groq-ai-term-generated-meta-description" class="large-text" rows="3"></textarea>
-					<h3><?php esc_html_e( 'Gegenereerde Rank Math focus keywords', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h3>
-					<textarea id="groq-ai-term-generated-focus-keywords" class="large-text" rows="2"></textarea>
-				<?php endif; ?>
-				<h3><?php esc_html_e( 'Ruwe JSON-output', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h3>
-				<pre id="groq-ai-term-raw" style="background:#fff;border:1px solid #ddd;padding:12px;max-height:240px;overflow:auto;"></pre>
-			</form>
-		</div>
-		<?php
-	}
-
-	private function resolve_term_bottom_description_meta_key( $term, $settings ) {
-		$default_key = '';
-		if ( is_array( $settings ) && isset( $settings['term_bottom_description_meta_key'] ) ) {
-			$default_key = sanitize_key( (string) $settings['term_bottom_description_meta_key'] );
-		}
-
-		$key = apply_filters( 'groq_ai_term_bottom_description_meta_key', $default_key, $term, $settings );
-		$key = sanitize_key( (string) $key );
-		return $key;
-	}
-
-	private function resolve_rankmath_term_meta_keys( $term, $settings ) {
-		$keys = [
-			'title'        => 'rank_math_title',
-			'description'  => 'rank_math_description',
-			'focus_keyword' => 'rank_math_focus_keyword',
-		];
-		$keys = apply_filters( 'groq_ai_rankmath_term_meta_keys', $keys, $term, $settings );
-		if ( ! is_array( $keys ) ) {
-			$keys = [];
-		}
-
-		return [
-			'title'        => isset( $keys['title'] ) ? sanitize_key( (string) $keys['title'] ) : 'rank_math_title',
-			'description'  => isset( $keys['description'] ) ? sanitize_key( (string) $keys['description'] ) : 'rank_math_description',
-			'focus_keyword' => isset( $keys['focus_keyword'] ) ? sanitize_key( (string) $keys['focus_keyword'] ) : 'rank_math_focus_keyword',
-		];
-	}
-
-	private function get_term_prompt_text( $term, $custom_prompt = null ) {
-		$prompt = ( null !== $custom_prompt ) ? $custom_prompt : '';
-
-		if ( null === $custom_prompt && $term && isset( $term->term_id ) ) {
-			$prompt = get_term_meta( $term->term_id, 'groq_ai_term_custom_prompt', true );
-		}
-
-		$prompt = trim( (string) $prompt );
-		if ( '' !== $prompt ) {
-			return $prompt;
-		}
-
-		$default_prompt = __( 'Schrijf een SEO-vriendelijke categorieomschrijving in het Nederlands. Gebruik duidelijke tussenkoppen en <p>-tags. Voeg geen prijsinformatie toe.', GROQ_AI_PRODUCT_TEXT_DOMAIN );
-
-		return apply_filters( 'groq_ai_default_term_prompt', $default_prompt, $term );
-	}
-
-	
-
 	public function render_product_attribute_includes_field() {
 		$settings = $this->plugin->get_settings();
 		$values   = isset( $settings['product_attribute_includes'] ) && is_array( $settings['product_attribute_includes'] )
@@ -1331,6 +551,106 @@ class Groq_AI_Product_Text_Settings_Page {
 			<?php endif; ?>
 		</div>
 		<?php
+	}
+
+	private function render_model_select_field( $field_args ) {
+		$name    = isset( $field_args['name'] ) ? $field_args['name'] : '';
+		$id      = isset( $field_args['id'] ) && '' !== $field_args['id'] ? $field_args['id'] : 'groq-ai-model-select';
+		$current = isset( $field_args['value'] ) ? (string) $field_args['value'] : '';
+		$placeholder = __( 'Selecteer eerst een aanbieder', GROQ_AI_PRODUCT_TEXT_DOMAIN );
+		?>
+		<div class="groq-ai-model-field">
+			<select id="<?php echo esc_attr( $id ); ?>" name="<?php echo esc_attr( $name ); ?>" data-current-model="<?php echo esc_attr( $current ); ?>">
+				<option value="" selected="selected"><?php echo esc_html( $placeholder ); ?></option>
+			</select>
+		</div>
+		<button type="button" class="button" id="groq-ai-refresh-models"><?php esc_html_e( 'Live modellen ophalen', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></button>
+		<p id="groq-ai-refresh-models-status" class="description"></p>
+		<?php
+	}
+
+	private function render_provider_api_key_field( $field_args ) {
+		$attributes = isset( $field_args['attributes'] ) && is_array( $field_args['attributes'] ) ? $field_args['attributes'] : [];
+		$attributes['name'] = isset( $field_args['name'] ) ? $field_args['name'] : '';
+
+		if ( ! isset( $attributes['id'] ) && ! empty( $field_args['id'] ) ) {
+			$attributes['id'] = $field_args['id'];
+		}
+
+		if ( ! isset( $attributes['class'] ) ) {
+			$attributes['class'] = 'regular-text';
+		}
+
+		if ( ! isset( $attributes['type'] ) ) {
+			$attributes['type'] = 'password';
+		}
+
+		if ( ! isset( $attributes['autocomplete'] ) ) {
+			$attributes['autocomplete'] = 'off';
+		}
+
+		$attributes['value'] = isset( $field_args['value'] ) ? $field_args['value'] : '';
+
+		printf( '<input %s />', $this->format_html_attributes( $attributes ) );
+
+		if ( isset( $field_args['provider_key'] ) && 'google' === $field_args['provider_key'] ) {
+			$this->render_google_safety_fields( $field_args );
+		}
+	}
+
+	private function render_google_safety_fields( $field_args ) {
+		$categories = isset( $field_args['google_safety_categories'] ) && is_array( $field_args['google_safety_categories'] )
+			? $field_args['google_safety_categories']
+			: [];
+		$thresholds = isset( $field_args['google_safety_thresholds'] ) && is_array( $field_args['google_safety_thresholds'] )
+			? $field_args['google_safety_thresholds']
+			: [];
+
+		if ( empty( $categories ) || empty( $thresholds ) ) {
+			return;
+		}
+
+		$selected_settings = isset( $field_args['google_safety_settings'] ) && is_array( $field_args['google_safety_settings'] )
+			? $field_args['google_safety_settings']
+			: [];
+		$option_key = $this->plugin->get_option_key();
+		?>
+		<div class="groq-ai-google-safety-settings" style="margin-top:16px; padding:16px; border:1px solid #dcdcde; background:#f6f7f7;">
+			<strong><?php esc_html_e( 'Gemini safety filters', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
+			<p class="description" style="margin-top:4px;"><?php esc_html_e( 'Kies optioneel welke beleidscategorieën je zelf instelt. Laat op "Google standaard" om geen safetySettings mee te sturen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+			<?php foreach ( $categories as $category_key => $info ) :
+				$category_label       = isset( $info['label'] ) ? $info['label'] : $category_key;
+				$category_description = isset( $info['description'] ) ? $info['description'] : '';
+				$selected_threshold   = isset( $selected_settings[ $category_key ] ) ? $selected_settings[ $category_key ] : '';
+				$field_id             = 'groq-ai-google-safety-' . sanitize_html_class( $category_key );
+				?>
+				<label for="<?php echo esc_attr( $field_id ); ?>" style="display:block; margin:12px 0 4px;">
+					<span style="display:block; margin-bottom:4px;"><strong><?php echo esc_html( $category_label ); ?></strong></span>
+					<select id="<?php echo esc_attr( $field_id ); ?>" name="<?php echo esc_attr( $option_key ); ?>[google_safety_settings][<?php echo esc_attr( $category_key ); ?>]" style="max-width:280px;">
+						<?php foreach ( $thresholds as $threshold_key => $threshold_label ) : ?>
+							<option value="<?php echo esc_attr( $threshold_key ); ?>" <?php selected( $selected_threshold, $threshold_key ); ?>><?php echo esc_html( $threshold_label ); ?></option>
+						<?php endforeach; ?>
+					</select>
+					<?php if ( '' !== $category_description ) : ?>
+						<p class="description" style="margin:4px 0 0;"><?php echo esc_html( $category_description ); ?></p>
+					<?php endif; ?>
+				</label>
+			<?php endforeach; ?>
+		</div>
+		<?php
+	}
+
+	private function format_html_attributes( $attributes ) {
+		$pairs = [];
+		foreach ( $attributes as $key => $value ) {
+			if ( '' === $value && 0 !== $value && '0' !== $value ) {
+				continue;
+			}
+
+			$pairs[] = sprintf( '%s="%s"', esc_attr( $key ), esc_attr( $value ) );
+		}
+
+		return implode( ' ', $pairs );
 	}
 
 	private function get_product_attribute_include_options() {
@@ -1471,9 +791,6 @@ class Groq_AI_Product_Text_Settings_Page {
 			'settings_page_groq-ai-product-text',
 			'settings_page_groq-ai-product-text-modules',
 			'settings_page_groq-ai-product-text-prompts',
-			'settings_page_groq-ai-product-text-categories',
-			'settings_page_groq-ai-product-text-brands',
-			'settings_page_groq-ai-product-text-term',
 			'settings_page_groq-ai-product-text-logs',
 		];
 
@@ -1489,19 +806,15 @@ class Groq_AI_Product_Text_Settings_Page {
 			return;
 		}
 
-		wp_enqueue_style(
-			'groq-ai-settings',
-			plugins_url( 'assets/css/admin.css', GROQ_AI_PRODUCT_TEXT_FILE ),
-			[],
-			GROQ_AI_PRODUCT_TEXT_VERSION
-		);
+		$this->enqueue_admin_styles();
 
-		wp_enqueue_style(
-			'groq-ai-settings-extra',
-			plugins_url( 'assets/css/settings.css', GROQ_AI_PRODUCT_TEXT_FILE ),
-			[ 'groq-ai-settings' ],
-			GROQ_AI_PRODUCT_TEXT_VERSION
-		);
+		$current_page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+
+		$is_main_settings_screen = ( 0 === strpos( (string) $hook, 'settings_page_groq-ai-product-text' ) ) && ( 'groq-ai-product-text' === $current_page );
+
+		if ( ! $is_main_settings_screen ) {
+			return;
+		}
 
 		wp_enqueue_script(
 			'groq-ai-settings',
@@ -1511,96 +824,8 @@ class Groq_AI_Product_Text_Settings_Page {
 			true
 		);
 
-		$current_page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
-
-		if ( 0 === strpos( (string) $hook, 'settings_page_groq-ai-product-text-term' ) ) {
-			wp_enqueue_script(
-				'groq-ai-term-admin',
-				plugins_url( 'assets/js/term-admin.js', GROQ_AI_PRODUCT_TEXT_FILE ),
-				[],
-				GROQ_AI_PRODUCT_TEXT_VERSION,
-				true
-			);
-
-			$taxonomy = isset( $_GET['taxonomy'] ) ? sanitize_key( wp_unslash( $_GET['taxonomy'] ) ) : '';
-			$term_id  = isset( $_GET['term_id'] ) ? absint( $_GET['term_id'] ) : 0;
-			wp_localize_script(
-				'groq-ai-term-admin',
-				'GroqAITermGenerator',
-				[
-					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-					'nonce'  => wp_create_nonce( 'groq_ai_generate_term' ),
-					'taxonomy' => $taxonomy,
-					'termId' => $term_id,
-				]
-			);
-		}
-
-		$bulk_taxonomy     = '';
-		$bulk_allow_regen  = false;
-		$bulk_strings      = [];
-
-		if ( 0 === strpos( (string) $hook, 'settings_page_groq-ai-product-text-categories' ) ) {
-			$bulk_taxonomy    = 'product_cat';
-			$bulk_allow_regen = true;
-			$bulk_strings     = [
-				'statusIdle'     => __( 'Bulk gestart. AI werkt de geselecteerde categorieën bij…', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-				'statusProgress' => __( 'Categorie %1$s van %2$s: %3$s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-				'statusDone'     => __( 'Klaar! %d categorieën bijgewerkt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-				'statusStopped'  => __( 'Bulk generatie gestopt. %d categorieën bijgewerkt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-				'statusEmpty'    => __( 'Geen categorieën zonder omschrijving gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-				'logSuccess'     => __( '%1$s gevuld (%2$d woorden).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-				'logError'       => __( '%1$s mislukt: %2$s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-				'confirmStop'    => __( 'Weet je zeker dat je wilt stoppen? De huidige categorie kan onafgemaakt blijven.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-				'confirmRegenerate'  => __( 'Wil je categorie %s opnieuw laten schrijven?', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-				'regenerateProgress' => __( '%s wordt opnieuw geschreven…', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-				'regenerateDone'     => __( '%s is bijgewerkt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-				'regenerateError'    => __( 'Kon %1$s niet bijwerken: %2$s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-				'regenerateBlocked'  => __( 'Wacht tot de bulk generatie klaar is voordat je een categorie opnieuw genereert.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-			];
-		} elseif ( 0 === strpos( (string) $hook, 'settings_page_groq-ai-product-text-brands' ) ) {
-			$detected_taxonomy = $this->detect_brand_taxonomy();
-			if ( '' !== $detected_taxonomy ) {
-				$bulk_taxonomy    = $detected_taxonomy;
-				$bulk_allow_regen = true;
-				$bulk_strings     = [
-					'statusIdle'           => __( 'Bulk gestart. AI werkt de geselecteerde merken bij…', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-					'statusProgress'       => __( 'Merk %1$s van %2$s: %3$s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-					'statusDone'           => __( 'Klaar! %d merken bijgewerkt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-					'statusStopped'        => __( 'Bulk generatie gestopt. %d merken bijgewerkt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-					'statusEmpty'          => __( 'Geen merken zonder omschrijving gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-					'logSuccess'           => __( '%1$s gevuld (%2$d woorden).', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-					'logError'             => __( '%1$s mislukt: %2$s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-					'confirmStop'          => __( 'Weet je zeker dat je wilt stoppen? Het huidige merk kan onafgemaakt blijven.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-					'confirmRegenerate'    => __( 'Wil je %s opnieuw laten schrijven?', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-					'regenerateProgress'   => __( '%s wordt opnieuw geschreven…', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-					'regenerateDone'       => __( '%s is bijgewerkt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-					'regenerateError'      => __( 'Kon %1$s niet bijwerken: %2$s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-					'regenerateBlocked'    => __( 'Wacht tot de bulk generatie klaar is voordat je een merk opnieuw genereert.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
-				];
-			}
-		}
-
-		if ( '' !== $bulk_taxonomy ) {
-			wp_enqueue_script(
-				'groq-ai-term-bulk',
-				plugins_url( 'assets/js/term-bulk.js', GROQ_AI_PRODUCT_TEXT_FILE ),
-				[],
-				GROQ_AI_PRODUCT_TEXT_VERSION,
-				true
-			);
-
-			$this->localize_term_bulk_script(
-				$bulk_taxonomy,
-				[
-					'allowRegenerate' => $bulk_allow_regen,
-					'strings'         => $bulk_strings,
-				]
-			);
-		}
-
 		$current_settings = $this->plugin->get_settings();
-		$data = [
+		$data             = [
 			'optionKey'       => $this->plugin->get_option_key(),
 			'providers'       => [],
 			'currentProvider' => $current_settings['provider'],
@@ -1615,15 +840,15 @@ class Groq_AI_Product_Text_Settings_Page {
 		];
 
 		foreach ( $this->provider_manager->get_providers() as $provider ) {
-			$provider_key   = $provider->get_key();
-			$cached_models  = $this->plugin->get_cached_models_for_provider( $provider_key );
-			$cached_models  = Groq_AI_Model_Exclusions::filter_models( $provider_key, $cached_models );
-			$data['providers'][ $provider->get_key() ] = [
+			$provider_key  = $provider->get_key();
+			$cached_models = $this->plugin->get_cached_models_for_provider( $provider_key );
+			$cached_models = Groq_AI_Model_Exclusions::filter_models( $provider_key, $cached_models );
+			$data['providers'][ $provider_key ] = [
 				'default_label' => sprintf( __( 'Gebruik standaardmodel (%s)', GROQ_AI_PRODUCT_TEXT_DOMAIN ), $provider->get_default_model() ),
 				'models'        => $cached_models,
 				'supports_live' => $provider->supports_live_models(),
 			];
-			$data['providerRows'][ $provider->get_key() ] = 'groq_ai_api_key_' . $provider->get_key();
+			$data['providerRows'][ $provider_key ] = 'groq_ai_api_key_' . $provider_key;
 		}
 
 		wp_localize_script( 'groq-ai-settings', 'GroqAISettingsData', $data );
@@ -1861,67 +1086,4 @@ class Groq_AI_Product_Text_Settings_Page {
 		$this->redirect_with_google_notice( 'test', implode( ' ', $messages ), $redirect );
 	}
 
-	public function handle_save_term_content() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'Je hebt geen toestemming om deze actie uit te voeren.', GROQ_AI_PRODUCT_TEXT_DOMAIN ), '', [ 'response' => 403 ] );
-		}
-
-		check_admin_referer( 'groq_ai_save_term_content' );
-
-		$taxonomy = isset( $_POST['taxonomy'] ) ? sanitize_key( wp_unslash( $_POST['taxonomy'] ) ) : '';
-		$term_id  = isset( $_POST['term_id'] ) ? absint( $_POST['term_id'] ) : 0;
-
-		if ( '' === $taxonomy || ! taxonomy_exists( $taxonomy ) || ! $term_id ) {
-			$this->redirect_with_term_notice( $taxonomy, $term_id, 'error', __( 'Ongeldige term.', GROQ_AI_PRODUCT_TEXT_DOMAIN ), 'error' );
-		}
-
-		$term = get_term( $term_id, $taxonomy );
-		if ( ! $term || is_wp_error( $term ) ) {
-			$this->redirect_with_term_notice( $taxonomy, $term_id, 'error', __( 'Term niet gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ), 'error' );
-		}
-
-		$description        = isset( $_POST['description'] ) ? wp_kses_post( wp_unslash( $_POST['description'] ) ) : '';
-		$bottom_description = isset( $_POST['groq_ai_term_bottom_description'] ) ? wp_kses_post( wp_unslash( $_POST['groq_ai_term_bottom_description'] ) ) : '';
-		$custom_prompt      = isset( $_POST['groq_ai_term_custom_prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['groq_ai_term_custom_prompt'] ) ) : '';
-
-		$update = wp_update_term(
-			$term_id,
-			$taxonomy,
-			[
-				'description' => $description,
-			]
-		);
-
-		if ( is_wp_error( $update ) ) {
-			$this->redirect_with_term_notice( $taxonomy, $term_id, 'error', $update->get_error_message(), 'error' );
-		}
-
-		$settings        = $this->plugin->get_settings();
-		$bottom_meta_key = $this->resolve_term_bottom_description_meta_key( $term, $settings );
-		$bottom_meta_key = '' !== $bottom_meta_key ? $bottom_meta_key : 'groq_ai_term_bottom_description';
-		update_term_meta( $term_id, $bottom_meta_key, $bottom_description );
-
-		if ( '' === trim( $custom_prompt ) ) {
-			delete_term_meta( $term_id, 'groq_ai_term_custom_prompt' );
-		} else {
-			update_term_meta( $term_id, 'groq_ai_term_custom_prompt', $custom_prompt );
-		}
-
-		if ( isset( $_POST['groq_ai_term_bottom_description'] ) && $bottom_meta_key !== 'groq_ai_term_bottom_description' ) {
-			update_term_meta( $term_id, 'groq_ai_term_bottom_description', $bottom_description );
-		}
-
-		if ( $this->plugin->is_module_enabled( 'rankmath', $settings ) ) {
-			$rankmath_keys        = $this->resolve_rankmath_term_meta_keys( $term, $settings );
-			$rankmath_title       = isset( $_POST['groq_ai_rankmath_meta_title'] ) ? sanitize_text_field( wp_unslash( $_POST['groq_ai_rankmath_meta_title'] ) ) : '';
-			$rankmath_description = isset( $_POST['groq_ai_rankmath_meta_description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['groq_ai_rankmath_meta_description'] ) ) : '';
-			$rankmath_keywords    = isset( $_POST['groq_ai_rankmath_focus_keywords'] ) ? sanitize_text_field( wp_unslash( $_POST['groq_ai_rankmath_focus_keywords'] ) ) : '';
-
-			update_term_meta( $term_id, $rankmath_keys['title'], $rankmath_title );
-			update_term_meta( $term_id, $rankmath_keys['description'], $rankmath_description );
-			update_term_meta( $term_id, $rankmath_keys['focus_keyword'], $rankmath_keywords );
-		}
-
-		$this->redirect_with_term_notice( $taxonomy, $term_id, 'saved', __( 'Term opgeslagen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) );
-	}
 }

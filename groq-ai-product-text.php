@@ -58,9 +58,15 @@ require_once __DIR__ . '/includes/Services/Google/class-groq-ai-google-oauth-cli
 require_once __DIR__ . '/includes/Services/Google/class-groq-ai-google-search-console-client.php';
 require_once __DIR__ . '/includes/Services/Google/class-groq-ai-google-analytics-data-client.php';
 require_once __DIR__ . '/includes/Services/Google/class-groq-ai-google-context-builder.php';
+require_once __DIR__ . '/includes/Admin/class-groq-ai-admin-base.php';
+require_once __DIR__ . '/includes/Admin/class-groq-ai-term-admin-base.php';
+require_once __DIR__ . '/includes/Admin/class-groq-ai-categories-admin.php';
+require_once __DIR__ . '/includes/Admin/class-groq-ai-brands-admin.php';
 require_once __DIR__ . '/includes/Admin/class-groq-ai-settings-page.php';
+require_once __DIR__ . '/includes/Admin/class-groq-ai-logs-admin.php';
 require_once __DIR__ . '/includes/Admin/class-groq-ai-logs-table.php';
 require_once __DIR__ . '/includes/Admin/class-groq-ai-product-ui.php';
+require_once __DIR__ . '/includes/Admin/class-groq-ai-settings-renderer.php';
 
 if( ! class_exists( 'SitiWebUpdater' ) ){
 	include_once( plugin_dir_path( __FILE__ ) . 'SitiWebUpdater.php' );
@@ -85,8 +91,17 @@ final class Groq_AI_Product_Text_Plugin {
 	/** @var Groq_AI_Service_Container */
 	private $container;
 
-	/** @var  */
+	/** @var Groq_AI_Product_Text_Settings_Page */
 	private $settings_page;
+
+	/** @var Groq_AI_Categories_Admin */
+	private $categories_admin;
+
+	/** @var Groq_AI_Brands_Admin */
+	private $brands_admin;
+
+	/** @var Groq_AI_Logs_Admin */
+	private $logs_admin;
 
 	/** @var Groq_AI_Product_Text_Product_UI */
 	private $product_ui;
@@ -106,6 +121,9 @@ final class Groq_AI_Product_Text_Plugin {
 		$this->register_services();
 
 		$this->settings_page    = new Groq_AI_Product_Text_Settings_Page( $this, $this->get_provider_manager() );
+		$this->categories_admin = new Groq_AI_Categories_Admin( $this );
+		$this->brands_admin     = new Groq_AI_Brands_Admin( $this );
+		$this->logs_admin       = new Groq_AI_Logs_Admin( $this );
 		$this->product_ui       = new Groq_AI_Product_Text_Product_UI( $this );
 
 		add_action( 'init', [ $this, 'load_textdomain' ] );
@@ -364,6 +382,14 @@ final class Groq_AI_Product_Text_Plugin {
 
 	public function get_loggable_settings_snapshot( $settings = null ) {
 		return $this->get_settings_manager()->get_loggable_settings_snapshot( $settings );
+	}
+
+	public function create_settings_renderer( $values = null ) {
+		if ( null === $values ) {
+			$values = $this->get_settings();
+		}
+
+		return new Groq_AI_Settings_Renderer( self::OPTION_KEY, $values );
 	}
 
 	public function should_use_response_format( Groq_AI_Provider_Interface $provider, $settings ) {
