@@ -60,10 +60,14 @@ class Groq_AI_Logs_Table extends WP_List_Table {
 		$current_page = $this->get_pagenum();
 		$offset       = ( $current_page - 1 ) * $per_page;
 
-		$orderby = isset( $_REQUEST['orderby'] ) ? sanitize_sql_orderby( wp_unslash( $_REQUEST['orderby'] ) ) : 'created_at';
-		if ( ! $orderby ) {
-			$orderby = 'created_at';
-		}
+		$allowed_orderby = [
+			'created_at' => 'created_at',
+			'provider'   => 'provider',
+			'model'      => 'model',
+			'status'     => 'status',
+		];
+		$orderby = isset( $_REQUEST['orderby'] ) ? sanitize_key( wp_unslash( $_REQUEST['orderby'] ) ) : 'created_at';
+		$orderby = isset( $allowed_orderby[ $orderby ] ) ? $allowed_orderby[ $orderby ] : 'created_at';
 		$order = isset( $_REQUEST['order'] ) ? strtoupper( sanitize_text_field( wp_unslash( $_REQUEST['order'] ) ) ) : 'DESC';
 		$order = in_array( $order, [ 'ASC', 'DESC' ], true ) ? $order : 'DESC';
 

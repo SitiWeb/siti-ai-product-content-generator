@@ -73,6 +73,18 @@ class Groq_AI_Product_Text_Product_UI {
 					'postId'        => $post_id,
 					'contextDefaults' => isset( $settings['context_fields'] ) ? $settings['context_fields'] : $this->plugin->get_default_context_fields(),
 					'attributeIncludesDefaults' => $attribute_defaults,
+					'strings'       => [
+						'loading'        => __( 'AI is bezig met schrijven...', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'retry'          => __( 'Probeer het opnieuw of pas je prompt/context aan.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'errorDefault'   => __( 'Er ging iets mis bij het genereren.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'errorUnknown'   => __( 'Onbekende fout.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'success'        => __( 'Structuur gegenereerd. Kopieer of vul velden in.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'fieldApplied'   => __( '%s ingevuld.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'fieldApplyError' => __( 'Kon het veld niet automatisch invullen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'fieldCopied'    => __( '%s gekopieerd naar het klembord.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'jsonCopied'     => __( 'JSON gekopieerd naar het klembord.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'copyFailed'     => __( 'Kopiëren mislukt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					],
 				]
 			);
 		}

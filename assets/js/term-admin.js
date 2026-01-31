@@ -20,6 +20,14 @@
 	const includeTopProducts = document.getElementById('groq-ai-term-include-top-products');
 	const topProductsLimit = document.getElementById('groq-ai-term-top-products-limit');
 
+	const strings = (window.GroqAITermGenerator && GroqAITermGenerator.strings) || {};
+	const promptRequiredText = strings.promptRequired || 'Vul eerst een prompt in.';
+	const loadingText = strings.loading || 'AI is bezig met schrijven...';
+	const successText = strings.success || 'Tekst gegenereerd. Je kunt hem toepassen en opslaan.';
+	const applySuccessText = strings.applySuccess || 'Tekst ingevuld. Vergeet niet op "Opslaan" te klikken.';
+	const errorDefaultText = strings.errorDefault || 'Er ging iets mis bij het genereren.';
+	const errorUnknownText = strings.errorUnknown || 'Onbekende fout';
+
 	function setStatus(message, type) {
 		if (!statusField) {
 			return;
@@ -75,7 +83,7 @@
 				rankmathKeywordsField.value = outputFocusKeywordsField.value || '';
 			}
 
-			setStatus('Tekst ingevuld. Vergeet niet op "Opslaan" te klikken.', 'success');
+			setStatus(applySuccessText, 'success');
 		});
 	}
 
@@ -83,12 +91,12 @@
 		event.preventDefault();
 		const prompt = promptField ? (promptField.value || '').trim() : '';
 		if (!prompt) {
-			setStatus('Vul eerst een prompt in.', 'error');
+			setStatus(promptRequiredText, 'error');
 			return;
 		}
 
 		setLoading(true);
-		setStatus('AI is bezig met schrijven...', 'loading');
+		setStatus(loadingText, 'loading');
 		if (rawField) {
 			rawField.textContent = '';
 		}
@@ -109,7 +117,7 @@
 			.then((response) => response.json())
 			.then((json) => {
 				if (!json.success) {
-					const errorMessage = json.data && json.data.message ? json.data.message : 'Onbekende fout';
+					const errorMessage = json.data && json.data.message ? json.data.message : errorUnknownText;
 					throw new Error(errorMessage);
 				}
 
@@ -137,10 +145,10 @@
 					rawField.textContent = (json.data && json.data.raw ? String(json.data.raw) : '').trim();
 				}
 
-				setStatus('Tekst gegenereerd. Je kunt hem toepassen en opslaan.', 'success');
+				setStatus(successText, 'success');
 			})
 			.catch((error) => {
-				setStatus(error && error.message ? error.message : 'Er ging iets mis bij het genereren.', 'error');
+				setStatus(error && error.message ? error.message : errorDefaultText, 'error');
 			})
 			.finally(() => {
 				setLoading(false);

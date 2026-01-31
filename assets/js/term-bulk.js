@@ -11,6 +11,13 @@
 
 	const strings = data.strings || {};
 	const allowRegenerate = !!data.allowRegenerate;
+	const unknownErrorText = strings.unknownError || 'Onbekende fout';
+	const unknownTermText = strings.unknownTerm || 'Onbekende term.';
+	const confirmStopFallbackText = strings.confirmStopFallback || 'Stoppen?';
+	const logErrorDefaultText = strings.logErrorDefault || '%1$s: %2$s';
+	const logSuccessDefaultText = strings.logSuccessDefault || '%1$s gevuld.';
+	const regenerateErrorDefaultText = strings.regenerateErrorDefault || '%1$s mislukt: %2$s';
+	const regenerateDoneDefaultText = strings.regenerateDoneDefault || '%s is bijgewerkt.';
 	const terms = (Array.isArray(data.terms) ? data.terms : [])
 		.map((term) => {
 			const id = parseInt(term.id, 10);
@@ -146,19 +153,19 @@
 
 	function handleResponse(term, json, context) {
 		if (!json || !json.success) {
-			const errorMessage = (json && json.data && json.data.message) || 'Onbekende fout';
-			appendLog(formatString(strings.logError || '%1$s: %2$s', [term.name || term.id, errorMessage]), 'error');
+			const errorMessage = (json && json.data && json.data.message) || unknownErrorText;
+			appendLog(formatString(strings.logError || logErrorDefaultText, [term.name || term.id, errorMessage]), 'error');
 			if (context === 'single') {
-				setStatus(formatString(strings.regenerateError || '%1$s mislukt: %2$s', [term.name || term.id, errorMessage]), 'error');
+				setStatus(formatString(strings.regenerateError || regenerateErrorDefaultText, [term.name || term.id, errorMessage]), 'error');
 			}
 			return false;
 		}
 
 		const words = json.data && typeof json.data.words !== 'undefined' ? parseInt(json.data.words, 10) : term.words;
 		markTermCompleted(term, Number.isFinite(words) ? words : term.words);
-		appendLog(formatString(strings.logSuccess || '%1$s gevuld.', [term.name || term.id, term.words]), 'success');
+		appendLog(formatString(strings.logSuccess || logSuccessDefaultText, [term.name || term.id, term.words]), 'success');
 		if (context === 'single') {
-			setStatus(formatString(strings.regenerateDone || '%s is bijgewerkt.', [term.name || term.id]), 'success');
+			setStatus(formatString(strings.regenerateDone || regenerateDoneDefaultText, [term.name || term.id]), 'success');
 		}
 		return true;
 	}
@@ -233,7 +240,7 @@
 			if (!isRunning) {
 				return;
 			}
-			const confirmation = strings.confirmStop ? window.confirm(strings.confirmStop) : window.confirm('Stoppen?');
+			const confirmation = strings.confirmStop ? window.confirm(strings.confirmStop) : window.confirm(confirmStopFallbackText);
 			if (confirmation) {
 				abortRequested = true;
 			}
@@ -251,7 +258,7 @@
 				const termId = parseInt(button.getAttribute('data-term-id'), 10);
 				const term = termMap.get(termId);
 				if (!term) {
-					setStatus('Onbekende term.', 'error');
+					setStatus(unknownTermText, 'error');
 					return;
 				}
 				if (strings.confirmRegenerate) {
@@ -270,9 +277,9 @@
 						handleResponse(term, json, 'single');
 					})
 					.catch((error) => {
-						const message = error && error.message ? error.message : 'Onbekende fout';
-						appendLog(formatString(strings.logError || '%1$s: %2$s', [term.name || term.id, message]), 'error');
-						setStatus(formatString(strings.regenerateError || '%1$s mislukt: %2$s', [term.name || term.id, message]), 'error');
+						const message = error && error.message ? error.message : unknownErrorText;
+						appendLog(formatString(strings.logError || logErrorDefaultText, [term.name || term.id, message]), 'error');
+						setStatus(formatString(strings.regenerateError || regenerateErrorDefaultText, [term.name || term.id, message]), 'error');
 					})
 					.finally(() => {
 						button.disabled = false;

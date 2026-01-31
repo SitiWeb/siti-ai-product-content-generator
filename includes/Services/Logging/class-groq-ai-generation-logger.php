@@ -143,6 +143,20 @@ class Groq_AI_Generation_Logger {
 		update_option( self::OPTION_TABLE_CREATED, 1 );
 	}
 
+	public function cleanup_old_logs( $retention_days ) {
+		$retention_days = absint( $retention_days );
+		if ( $retention_days <= 0 || ! $this->logs_table_exists() ) {
+			return;
+		}
+
+		$cutoff = time() - ( $retention_days * DAY_IN_SECONDS );
+		$cutoff = gmdate( 'Y-m-d H:i:s', $cutoff );
+
+		global $wpdb;
+		$table = $this->get_logs_table_name();
+		$wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE created_at < %s", $cutoff ) );
+	}
+
 	private function extract_usage_token_value( $usage, $keys ) {
 		foreach ( (array) $keys as $key ) {
 			if ( isset( $usage[ $key ] ) ) {

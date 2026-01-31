@@ -89,10 +89,20 @@ abstract class Groq_AI_Term_Admin_Base extends Groq_AI_Admin_Base {
 			'taxonomy'        => $taxonomy,
 			'terms'           => $terms,
 			'allowRegenerate' => false,
-			'strings'         => [],
+			'strings'         => [
+				'unknownError'      => __( 'Onbekende fout', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'unknownTerm'       => __( 'Onbekende term.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'confirmStopFallback' => __( 'Stoppen?', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'logErrorDefault'   => __( '%1$s: %2$s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'logSuccessDefault' => __( '%1$s gevuld.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'regenerateErrorDefault' => __( '%1$s mislukt: %2$s', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'regenerateDoneDefault'  => __( '%s is bijgewerkt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			],
 		];
 
 		$config = wp_parse_args( $overrides, $defaults );
+		$override_strings = isset( $overrides['strings'] ) && is_array( $overrides['strings'] ) ? $overrides['strings'] : [];
+		$config['strings'] = array_merge( $defaults['strings'], $override_strings );
 
 		wp_localize_script( 'groq-ai-term-bulk', 'GroqAITermBulk', $config );
 	}
@@ -207,6 +217,14 @@ abstract class Groq_AI_Term_Admin_Base extends Groq_AI_Admin_Base {
 				'nonce'    => wp_create_nonce( 'groq_ai_generate_term' ),
 				'taxonomy' => $taxonomy,
 				'termId'   => $term_id,
+				'strings'  => [
+					'promptRequired' => __( 'Vul eerst een prompt in.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					'loading'        => __( 'AI is bezig met schrijven...', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					'success'        => __( 'Tekst gegenereerd. Je kunt hem toepassen en opslaan.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					'applySuccess'   => __( 'Tekst ingevuld. Vergeet niet op "Opslaan" te klikken.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					'errorDefault'   => __( 'Er ging iets mis bij het genereren.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					'errorUnknown'   => __( 'Onbekende fout', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				],
 			]
 		);
 	}

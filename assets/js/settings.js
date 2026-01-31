@@ -14,6 +14,14 @@
 			return;
 		}
 
+		const strings = data.strings || {};
+		const providerUnsupportedText = strings.providerUnsupported || 'Deze aanbieder ondersteunt dit niet.';
+		const apiKeyRequiredText = strings.apiKeyRequired || 'Vul eerst de API-sleutel in.';
+		const loadingModelsText = strings.loadingModels || 'Modellen worden opgehaald…';
+		const errorUnknownText = strings.errorUnknown || 'Onbekende fout';
+		const successModelsText = strings.successModels || 'Modellen bijgewerkt.';
+		const errorFetchText = strings.errorFetch || 'Ophalen mislukt.';
+
 		const providerSelect = document.querySelector('select[name="' + optionKey + '[provider]"]');
 		const modelSelect = document.getElementById('groq-ai-model-select');
 		const refreshButton = document.getElementById('groq-ai-refresh-models');
@@ -164,19 +172,19 @@
 			const provider = providerSelect ? providerSelect.value : data.currentProvider;
 			const providerData = data.providers && data.providers[provider] ? data.providers[provider] : null;
 			if (!providerData || !providerData.supports_live) {
-				setRefreshStatus('Deze aanbieder ondersteunt dit niet.', 'error');
+				setRefreshStatus(providerUnsupportedText, 'error');
 				return;
 			}
 
 			const keyField = document.querySelector('[data-provider-row="' + provider + '"] input');
 			const apiKey = keyField ? keyField.value.trim() : '';
 			if (!apiKey) {
-				setRefreshStatus('Vul eerst de API-sleutel in.', 'error');
+				setRefreshStatus(apiKeyRequiredText, 'error');
 				return;
 			}
 
 			refreshButton.disabled = true;
-			setRefreshStatus('Modellen worden opgehaald…', 'loading');
+			setRefreshStatus(loadingModelsText, 'loading');
 
 			const payload = new URLSearchParams();
 			payload.append('action', 'groq_ai_refresh_models');
@@ -194,14 +202,14 @@
 				.then((response) => response.json())
 				.then((json) => {
 					if (!json.success || !json.data || !Array.isArray(json.data.models)) {
-						throw new Error((json.data && json.data.message) || 'Onbekende fout');
+						throw new Error((json.data && json.data.message) || errorUnknownText);
 					}
 					data.providers[provider].models = json.data.models;
 					buildModelOptions();
-					setRefreshStatus('Modellen bijgewerkt.', 'success');
+					setRefreshStatus(successModelsText, 'success');
 				})
 				.catch((error) => {
-					setRefreshStatus(error.message || 'Ophalen mislukt.', 'error');
+					setRefreshStatus(error.message || errorFetchText, 'error');
 				})
 				.finally(() => {
 					refreshButton.disabled = false;

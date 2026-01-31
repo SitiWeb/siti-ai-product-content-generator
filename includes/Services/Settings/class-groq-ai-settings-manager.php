@@ -33,6 +33,7 @@ class Groq_AI_Settings_Manager {
 			'store_context'  => '',
 			'default_prompt' => '',
 			'max_output_tokens' => 2048,
+			'logs_retention_days' => 90,
 			'product_attribute_includes' => [],
 			'term_bottom_description_meta_key' => '',
 			'groq_api_key'   => '',
@@ -63,6 +64,8 @@ class Groq_AI_Settings_Manager {
 		$settings['modules']        = $this->sanitize_modules_settings( isset( $settings['modules'] ) ? $settings['modules'] : [] );
 		$settings['google_safety_settings'] = $this->sanitize_google_safety_settings( isset( $settings['google_safety_settings'] ) ? $settings['google_safety_settings'] : [] );
 		$settings['model']          = Groq_AI_Model_Exclusions::ensure_allowed( $settings['provider'], isset( $settings['model'] ) ? $settings['model'] : '' );
+		$logs_retention_days = isset( $settings['logs_retention_days'] ) ? (int) $settings['logs_retention_days'] : 90;
+		$settings['logs_retention_days'] = max( 0, min( 3650, $logs_retention_days ) );
 
 		$image_mode = isset( $settings['image_context_mode'] ) ? sanitize_text_field( $settings['image_context_mode'] ) : 'url';
 		if ( 'none' === $image_mode ) {
@@ -108,6 +111,7 @@ class Groq_AI_Settings_Manager {
 			'store_context'  => '',
 			'default_prompt' => '',
 			'max_output_tokens' => 2048,
+			'logs_retention_days' => 90,
 			'product_attribute_includes' => [],
 			'term_bottom_description_meta_key' => '',
 			'groq_api_key'   => '',
@@ -159,6 +163,10 @@ class Groq_AI_Settings_Manager {
 		// Keep within sane bounds across providers.
 		$max_output_tokens = max( 128, min( 8192, $max_output_tokens ) );
 
+		$logs_retention_days = isset( $input['logs_retention_days'] ) ? (int) $input['logs_retention_days'] : (int) $defaults['logs_retention_days'];
+		// 0 = keep indefinitely, otherwise cap at 10 years.
+		$logs_retention_days = max( 0, min( 3650, $logs_retention_days ) );
+
 		$context_fields = $this->normalize_context_fields( $context_posted ? $raw_input['context_fields'] : $defaults['context_fields'] );
 
 		if ( 'none' === $image_mode ) {
@@ -182,6 +190,7 @@ class Groq_AI_Settings_Manager {
 			'store_context'  => sanitize_textarea_field( $input['store_context'] ),
 			'default_prompt' => sanitize_textarea_field( $input['default_prompt'] ),
 			'max_output_tokens' => $max_output_tokens,
+			'logs_retention_days' => $logs_retention_days,
 			'product_attribute_includes' => $this->sanitize_product_attribute_includes( isset( $raw_input['product_attribute_includes'] ) ? $raw_input['product_attribute_includes'] : [] ),
 			'term_bottom_description_meta_key' => sanitize_key( (string) $input['term_bottom_description_meta_key'] ),
 			'groq_api_key'   => sanitize_text_field( $input['groq_api_key'] ),
@@ -442,6 +451,15 @@ class Groq_AI_Settings_Manager {
 		return self::get_google_safety_thresholds_list();
 	}
 
+	public function get_logs_retention_days( $settings = null ) {
+		if ( null === $settings ) {
+			$settings = $this->all();
+		}
+
+		$value = isset( $settings['logs_retention_days'] ) ? (int) $settings['logs_retention_days'] : 90;
+		return max( 0, min( 3650, $value ) );
+	}
+
 	public function get_loggable_settings_snapshot( $settings = null ) {
 		if ( null === $settings ) {
 			$settings = $this->all();
@@ -451,6 +469,7 @@ class Groq_AI_Settings_Manager {
 			'store_context',
 			'default_prompt',
 			'max_output_tokens',
+			'logs_retention_days',
 			'product_attribute_includes',
 			'context_fields',
 			'modules',

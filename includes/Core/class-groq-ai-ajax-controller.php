@@ -435,8 +435,21 @@ class Groq_AI_Ajax_Controller {
 
 		check_ajax_referer( 'groq_ai_generate', 'nonce' );
 
-		$prompt = isset( $_POST['prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prompt'] ) ) : '';
+		$prompt  = isset( $_POST['prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prompt'] ) ) : '';
 		$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+
+		if ( ! $post_id ) {
+			wp_send_json_error( [ 'message' => __( 'Post-ID ontbreekt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ], 400 );
+		}
+
+		$post = get_post( $post_id );
+		if ( ! $post || is_wp_error( $post ) || 'product' !== $post->post_type ) {
+			wp_send_json_error( [ 'message' => __( 'Product niet gevonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ], 404 );
+		}
+
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			wp_send_json_error( [ 'message' => __( 'Je hebt geen toestemming om dit product te bewerken.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ], 403 );
+		}
 
 		$settings      = $this->plugin->get_settings();
 		$provider_manager = $this->plugin->get_provider_manager();

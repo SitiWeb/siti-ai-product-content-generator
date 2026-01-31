@@ -125,17 +125,7 @@ class Groq_AI_Product_Text_Settings_Page extends Groq_AI_Admin_Base {
 		$brands_url     = $this->get_page_url( 'groq-ai-product-text-brands' );
 
 		$prompt_preview = $this->plugin->build_prompt_template_preview( $settings );
-		$google_notice  = isset( $_GET['groq_ai_google_notice'] ) ? sanitize_key( wp_unslash( $_GET['groq_ai_google_notice'] ) ) : '';
-		$google_status  = isset( $_GET['groq_ai_google_notice_status'] ) ? sanitize_key( wp_unslash( $_GET['groq_ai_google_notice_status'] ) ) : '';
-		$google_message = '';
-		if ( isset( $_GET['groq_ai_google_notice_message'] ) ) {
-			$google_message = sanitize_text_field( rawurldecode( wp_unslash( $_GET['groq_ai_google_notice_message'] ) ) );
-		}
 
-		$google_connected       = ! empty( $settings['google_oauth_refresh_token'] );
-		$google_connected_email = isset( $settings['google_oauth_connected_email'] ) ? (string) $settings['google_oauth_connected_email'] : '';
-		$google_connected_at    = isset( $settings['google_oauth_connected_at'] ) ? absint( $settings['google_oauth_connected_at'] ) : 0;
-		$oauth_redirect         = add_query_arg( 'action', 'groq_ai_google_oauth_callback', admin_url( 'admin-post.php' ) );
 		$google_safety_settings = $this->plugin->get_google_safety_settings( $settings );
 		$google_safety_categories = $this->plugin->get_google_safety_categories();
 		$google_safety_thresholds = $this->plugin->get_google_safety_thresholds();
@@ -145,7 +135,7 @@ class Groq_AI_Product_Text_Settings_Page extends Groq_AI_Admin_Base {
 		<div class="wrap">
 			<h1><?php esc_html_e( 'Siti AI instellingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
 			<p class="description">
-				<?php esc_html_e( 'Kies je AI-aanbieder, beheer API-sleutels en koppel optioneel Google Search Console/Analytics voor extra context.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
+				<?php esc_html_e( 'Kies je AI-aanbieder en beheer API-sleutels voor de contentgeneratie.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?>
 			</p>
 			<p style="margin:16px 0; display:flex; flex-wrap:wrap; gap:8px;">
 				<a class="button" href="<?php echo esc_url( $prompt_url ); ?>"><?php esc_html_e( 'Prompt instellingen', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></a>
@@ -155,12 +145,7 @@ class Groq_AI_Product_Text_Settings_Page extends Groq_AI_Admin_Base {
 				<a class="button" href="<?php echo esc_url( $brands_url ); ?>"><?php esc_html_e( 'Merk teksten', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></a>
 			</p>
 			<?php settings_errors( $option_key ); ?>
-			<?php if ( $google_notice ) :
-				$class = ( 'error' === $google_status ) ? 'notice-error' : 'notice-success';
-				$google_message = '' !== $google_message ? $google_message : ( 'connected' === $google_notice ? __( 'Google OAuth is verbonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) : ( 'disconnected' === $google_notice ? __( 'Google OAuth is ontkoppeld.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) : __( 'Google test afgerond.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ) );
-				?>
-				<div class="notice <?php echo esc_attr( $class ); ?>"><p><?php echo esc_html( $google_message ); ?></p></div>
-			<?php endif; ?>
+
 			<div style="margin:16px 0; padding:16px; background:#fff; border:1px solid #dcdcde;">
 				<strong><?php esc_html_e( 'Huidige promptcontext', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
 				<pre style="background:#f6f7f7; padding:12px; overflow:auto; margin-top:8px; white-space:pre-wrap;"><?php echo esc_html( $prompt_preview ); ?></pre>
@@ -245,6 +230,18 @@ class Groq_AI_Product_Text_Settings_Page extends Groq_AI_Admin_Base {
 				);
 				$renderer->field(
 					[
+						'label'       => __( 'Logboek retentie (dagen)', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+						'key'         => 'logs_retention_days',
+						'type'        => 'number',
+						'attributes'  => [
+							'min' => 0,
+							'max' => 3650,
+						],
+						'description' => __( 'Hoe lang logboekregels bewaard blijven. Zet op 0 om logs onbeperkt te bewaren.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+					]
+				);
+				$renderer->field(
+					[
 						'label'       => __( 'Term meta key (onderste tekst)', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 						'key'         => 'term_bottom_description_meta_key',
 						'placeholder' => 'groq_ai_term_bottom_description',
@@ -262,8 +259,80 @@ class Groq_AI_Product_Text_Settings_Page extends Groq_AI_Admin_Base {
 				$renderer->close_table();
 				?>
 
+				<p class="submit"><?php submit_button( __( 'Instellingen opslaan', GROQ_AI_PRODUCT_TEXT_DOMAIN ), 'primary', 'submit', false ); ?></p>
+			</form>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Register plugin settings with WordPress.
+	 */
+	public function register_settings() {
+		register_setting(
+			$this->plugin->get_option_key(),
+			$this->plugin->get_option_key(),
+			[ $this->plugin, 'sanitize_settings' ]
+		);
+	}
+
+	public function hide_menu_links() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		?>
+		<style>
+			#adminmenu a[href="options-general.php?page=groq-ai-product-text-modules"],
+			#adminmenu a[href="options-general.php?page=groq-ai-product-text-logs"],
+			#adminmenu a[href="options-general.php?page=groq-ai-product-text-prompts"],
+			#adminmenu a[href="options-general.php?page=groq-ai-product-text-term"],
+			#adminmenu a[href="options-general.php?page=groq-ai-product-text-log"] {
+				display: none !important;
+			}
+		</style>
+		<?php
+	}
+
+	public function render_modules_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$option_key  = $this->plugin->get_option_key();
+		$settings    = $this->plugin->get_settings();
+		$current_page = $this->get_page_url( 'groq-ai-product-text-modules' );
+		$oauth_redirect = add_query_arg( 'action', 'groq_ai_google_oauth_callback', admin_url( 'admin-post.php' ) );
+		$google_notice  = isset( $_GET['groq_ai_google_notice'] ) ? sanitize_key( wp_unslash( $_GET['groq_ai_google_notice'] ) ) : '';
+		$google_status  = isset( $_GET['groq_ai_google_notice_status'] ) ? sanitize_key( wp_unslash( $_GET['groq_ai_google_notice_status'] ) ) : '';
+		$google_message = '';
+		if ( isset( $_GET['groq_ai_google_notice_message'] ) ) {
+			$google_message = sanitize_text_field( rawurldecode( wp_unslash( $_GET['groq_ai_google_notice_message'] ) ) );
+		}
+		$google_connected       = ! empty( $settings['google_oauth_refresh_token'] );
+		$google_connected_email = isset( $settings['google_oauth_connected_email'] ) ? (string) $settings['google_oauth_connected_email'] : '';
+		$google_connected_at    = isset( $settings['google_oauth_connected_at'] ) ? absint( $settings['google_oauth_connected_at'] ) : 0;
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Siti AI modules', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
+			<p class="description"><?php esc_html_e( 'Schakel aanvullende integraties in en bepaal grenzen voor gegenereerde content.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+			<?php settings_errors( $option_key ); ?>
+			<?php if ( $google_notice ) :
+				$class = ( 'error' === $google_status ) ? 'notice-error' : 'notice-success';
+				$google_message = '' !== $google_message ? $google_message : ( 'connected' === $google_notice ? __( 'Google OAuth is verbonden.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) : ( 'disconnected' === $google_notice ? __( 'Google OAuth is ontkoppeld.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) : __( 'Google test afgerond.', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ) );
+				?>
+				<div class="notice <?php echo esc_attr( $class ); ?>"><p><?php echo esc_html( $google_message ); ?></p></div>
+			<?php endif; ?>
+			<form method="post" action="options.php">
+				<?php settings_fields( $option_key ); ?>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Rank Math integratie', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
+						<td><?php $this->render_rankmath_module_field(); ?></td>
+					</tr>
+				</table>
 				<h2><?php esc_html_e( 'Google Search Console & Analytics', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
 				<?php
+				$renderer = $this->plugin->create_settings_renderer( $settings );
 				$renderer->open_table();
 				$renderer->field(
 					[
@@ -320,7 +389,7 @@ class Groq_AI_Product_Text_Settings_Page extends Groq_AI_Admin_Base {
 				);
 				$renderer->close_table();
 				?>
-				<p class="submit"><?php submit_button( __( 'Instellingen opslaan', GROQ_AI_PRODUCT_TEXT_DOMAIN ), 'primary', 'submit', false ); ?></p>
+				<?php submit_button( __( 'Modules opslaan', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ); ?>
 			</form>
 			<div style="margin-top:24px; padding:16px; border:1px solid #dcdcde; background:#fff;">
 				<h2><?php esc_html_e( 'Google verbinding', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
@@ -361,59 +430,6 @@ class Groq_AI_Product_Text_Settings_Page extends Groq_AI_Admin_Base {
 					<?php endif; ?>
 				</div>
 			</div>
-		</div>
-		<?php
-	}
-
-	/**
-	 * Register plugin settings with WordPress.
-	 */
-	public function register_settings() {
-		register_setting(
-			$this->plugin->get_option_key(),
-			$this->plugin->get_option_key(),
-			[ $this->plugin, 'sanitize_settings' ]
-		);
-	}
-
-	public function hide_menu_links() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-		?>
-		<style>
-			#adminmenu a[href="options-general.php?page=groq-ai-product-text-modules"],
-			#adminmenu a[href="options-general.php?page=groq-ai-product-text-logs"],
-			#adminmenu a[href="options-general.php?page=groq-ai-product-text-prompts"],
-			#adminmenu a[href="options-general.php?page=groq-ai-product-text-term"],
-			#adminmenu a[href="options-general.php?page=groq-ai-product-text-log"] {
-				display: none !important;
-			}
-		</style>
-		<?php
-	}
-
-	public function render_modules_page() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-
-		$option_key = $this->plugin->get_option_key();
-		?>
-		<div class="wrap">
-			<h1><?php esc_html_e( 'Siti AI modules', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h1>
-			<p class="description"><?php esc_html_e( 'Schakel aanvullende integraties in en bepaal grenzen voor gegenereerde content.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
-			<?php settings_errors( $option_key ); ?>
-			<form method="post" action="options.php">
-				<?php settings_fields( $option_key ); ?>
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row"><?php esc_html_e( 'Rank Math integratie', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></th>
-						<td><?php $this->render_rankmath_module_field(); ?></td>
-					</tr>
-				</table>
-				<?php submit_button( __( 'Modules opslaan', GROQ_AI_PRODUCT_TEXT_DOMAIN ) ); ?>
-			</form>
 		</div>
 		<?php
 	}
@@ -836,6 +852,14 @@ class Groq_AI_Product_Text_Settings_Page extends Groq_AI_Admin_Base {
 			'excludedModels'  => Groq_AI_Model_Exclusions::get_all(),
 			'placeholders'    => [
 				'selectModel' => __( 'Selecteer een model via "Live modellen ophalen"', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			],
+			'strings'         => [
+				'providerUnsupported' => __( 'Deze aanbieder ondersteunt dit niet.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'apiKeyRequired'       => __( 'Vul eerst de API-sleutel in.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'loadingModels'        => __( 'Modellen worden opgehaald…', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'errorUnknown'         => __( 'Onbekende fout', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'successModels'        => __( 'Modellen bijgewerkt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'errorFetch'           => __( 'Ophalen mislukt.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
 			],
 		];
 

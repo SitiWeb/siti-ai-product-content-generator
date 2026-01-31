@@ -1,0 +1,202 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: SitiAI Product Teksten\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-31 00:00+0000\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Domain: siti-ai-product-content-generator\n"
+
+#: assets/js/settings.js:166
+msgid "Deze aanbieder ondersteunt dit niet."
+msgstr ""
+
+#: assets/js/settings.js:173
+msgid "Vul eerst de API-sleutel in."
+msgstr ""
+
+#: assets/js/settings.js:177
+msgid "Modellen worden opgehaald…"
+msgstr ""
+
+#: assets/js/settings.js:197
+msgid "Onbekende fout"
+msgstr ""
+
+#: assets/js/settings.js:202
+msgid "Modellen bijgewerkt."
+msgstr ""
+
+#: assets/js/settings.js:205
+msgid "Ophalen mislukt."
+msgstr ""
+
+#: includes/Admin/class-groq-ai-settings-page.php:844
+msgid "Deze aanbieder ondersteunt dit niet."
+msgstr ""
+
+#: includes/Admin/class-groq-ai-settings-page.php:845
+msgid "Vul eerst de API-sleutel in."
+msgstr ""
+
+#: includes/Admin/class-groq-ai-settings-page.php:846
+msgid "Modellen worden opgehaald…"
+msgstr ""
+
+#: includes/Admin/class-groq-ai-settings-page.php:847
+msgid "Onbekende fout"
+msgstr ""
+
+#: includes/Admin/class-groq-ai-settings-page.php:848
+msgid "Modellen bijgewerkt."
+msgstr ""
+
+#: includes/Admin/class-groq-ai-settings-page.php:849
+msgid "Ophalen mislukt."
+msgstr ""
+
+#: assets/js/term-admin.js:24
+msgid "Vul eerst een prompt in."
+msgstr ""
+
+#: assets/js/term-admin.js:25
+msgid "AI is bezig met schrijven..."
+msgstr ""
+
+#: assets/js/term-admin.js:26
+msgid "Tekst gegenereerd. Je kunt hem toepassen en opslaan."
+msgstr ""
+
+#: assets/js/term-admin.js:27
+msgid "Tekst ingevuld. Vergeet niet op \"Opslaan\" te klikken."
+msgstr ""
+
+#: assets/js/term-admin.js:28
+msgid "Er ging iets mis bij het genereren."
+msgstr ""
+
+#: assets/js/term-admin.js:119
+msgid "Onbekende fout"
+msgstr ""
+
+#: includes/Admin/class-groq-ai-term-admin-base.php:212
+msgid "Onbekende fout"
+msgstr ""
+
+#: assets/js/admin.js:100
+msgid "AI is bezig met schrijven..."
+msgstr ""
+
+#: assets/js/admin.js:101
+msgid "Probeer het opnieuw of pas je prompt/context aan."
+msgstr ""
+
+#: assets/js/admin.js:102
+msgid "Er ging iets mis bij het genereren."
+msgstr ""
+
+#: assets/js/admin.js:103
+msgid "Onbekende fout."
+msgstr ""
+
+#: assets/js/admin.js:104
+msgid "Structuur gegenereerd. Kopieer of vul velden in."
+msgstr ""
+
+#: assets/js/admin.js:105
+msgid "%s ingevuld."
+msgstr ""
+
+#: assets/js/admin.js:106
+msgid "Kon het veld niet automatisch invullen."
+msgstr ""
+
+#: assets/js/admin.js:107
+msgid "%s gekopieerd naar het klembord."
+msgstr ""
+
+#: assets/js/admin.js:108
+msgid "JSON gekopieerd naar het klembord."
+msgstr ""
+
+#: assets/js/admin.js:109
+msgid "Kopiëren mislukt."
+msgstr ""
+
+
+#: includes/Admin/class-groq-ai-product-ui.php:84
+msgid "%s ingevuld."
+msgstr ""
+
+#: includes/Admin/class-groq-ai-product-ui.php:85
+msgid "Kon het veld niet automatisch invullen."
+msgstr ""
+
+#: includes/Admin/class-groq-ai-product-ui.php:86
+msgid "%s gekopieerd naar het klembord."
+msgstr ""
+
+#: includes/Admin/class-groq-ai-product-ui.php:87
+msgid "JSON gekopieerd naar het klembord."
+msgstr ""
+
+#: includes/Admin/class-groq-ai-product-ui.php:88
+msgid "Kopiëren mislukt."
+msgstr ""
+
+#: assets/js/term-bulk.js:149
+msgid "Onbekende fout"
+msgstr ""
+
+#: assets/js/term-bulk.js:150
+msgid "%1$s: %2$s"
+msgstr ""
+
+#: assets/js/term-bulk.js:152
+msgid "%1$s mislukt: %2$s"
+msgstr ""
+
+#: assets/js/term-bulk.js:159
+msgid "%1$s gevuld."
+msgstr ""
+
+#: assets/js/term-bulk.js:161
+msgid "%s is bijgewerkt."
+msgstr ""
+
+#: assets/js/term-bulk.js:236
+msgid "Stoppen?"
+msgstr ""
+
+#: assets/js/term-bulk.js:254
+msgid "Onbekende term."
+msgstr ""
+
+#: includes/Admin/class-groq-ai-term-admin-base.php:101
+msgid "Onbekende fout"
+msgstr ""
+
+#: includes/Admin/class-groq-ai-term-admin-base.php:102
+msgid "Onbekende term."
+msgstr ""
+
+#: includes/Admin/class-groq-ai-term-admin-base.php:103
+msgid "Stoppen?"
+msgstr ""
+
+#: includes/Admin/class-groq-ai-term-admin-base.php:104
+msgid "%1$s: %2$s"
+msgstr ""
+
+#: includes/Admin/class-groq-ai-term-admin-base.php:105
+msgid "%1$s gevuld."
+msgstr ""
+
+#: includes/Admin/class-groq-ai-term-admin-base.php:106
+msgid "%1$s mislukt: %2$s"
+msgstr ""
+
+#: includes/Admin/class-groq-ai-term-admin-base.php:107
+msgid "%s is bijgewerkt."
+msgstr ""

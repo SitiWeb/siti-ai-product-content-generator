@@ -96,8 +96,35 @@
 		statusField.setAttribute('data-status', type);
 	}
 
-	const loadingText = window.wp && wp.i18n ? wp.i18n.__('AI is bezig met schrijven...', 'siti-ai-product-content-generator') : 'AI is bezig met schrijven...';
-	const retryText = window.wp && wp.i18n ? wp.i18n.__('Probeer het opnieuw of pas je prompt/context aan.', 'siti-ai-product-content-generator') : 'Probeer het opnieuw of pas je prompt/context aan.';
+	const localized = (window.GroqAIGenerator && GroqAIGenerator.strings) || {};
+	const loadingText = localized.loading || (window.wp && wp.i18n ? wp.i18n.__('AI is bezig met schrijven...', 'siti-ai-product-content-generator') : 'AI is bezig met schrijven...');
+	const retryText = localized.retry || (window.wp && wp.i18n ? wp.i18n.__('Probeer het opnieuw of pas je prompt/context aan.', 'siti-ai-product-content-generator') : 'Probeer het opnieuw of pas je prompt/context aan.');
+	const errorDefaultText = localized.errorDefault || (window.wp && wp.i18n ? wp.i18n.__('Er ging iets mis bij het genereren.', 'siti-ai-product-content-generator') : 'Er ging iets mis bij het genereren.');
+	const errorUnknownText = localized.errorUnknown || (window.wp && wp.i18n ? wp.i18n.__('Onbekende fout.', 'siti-ai-product-content-generator') : 'Onbekende fout.');
+	const successText = localized.success || (window.wp && wp.i18n ? wp.i18n.__('Structuur gegenereerd. Kopieer of vul velden in.', 'siti-ai-product-content-generator') : 'Structuur gegenereerd. Kopieer of vul velden in.');
+	const fieldAppliedText = localized.fieldApplied || (window.wp && wp.i18n ? wp.i18n.__('%s ingevuld.', 'siti-ai-product-content-generator') : '%s ingevuld.');
+	const fieldApplyErrorText = localized.fieldApplyError || (window.wp && wp.i18n ? wp.i18n.__('Kon het veld niet automatisch invullen.', 'siti-ai-product-content-generator') : 'Kon het veld niet automatisch invullen.');
+	const fieldCopiedText = localized.fieldCopied || (window.wp && wp.i18n ? wp.i18n.__('%s gekopieerd naar het klembord.', 'siti-ai-product-content-generator') : '%s gekopieerd naar het klembord.');
+	const jsonCopiedText = localized.jsonCopied || (window.wp && wp.i18n ? wp.i18n.__('JSON gekopieerd naar het klembord.', 'siti-ai-product-content-generator') : 'JSON gekopieerd naar het klembord.');
+	const copyFailedText = localized.copyFailed || (window.wp && wp.i18n ? wp.i18n.__('Kopiëren mislukt.', 'siti-ai-product-content-generator') : 'Kopiëren mislukt.');
+
+	function formatString(template, values) {
+		if (!template) {
+			return '';
+		}
+		let autoIndex = 0;
+		return template.replace(/%(\d+\$)?s/g, (match, position) => {
+			let valueIndex;
+			if (position) {
+				valueIndex = parseInt(position, 10) - 1;
+			} else {
+				valueIndex = autoIndex;
+				autoIndex += 1;
+			}
+			const replacement = values[valueIndex];
+			return typeof replacement === 'undefined' ? '' : String(replacement);
+		});
+	}
 
 	function toggleLoading(isLoading) {
 		modal.classList.toggle('is-loading', isLoading);
@@ -137,7 +164,7 @@
 				.then((response) => response.json())
 				.then((json) => {
 					if (!json.success) {
-						const errorMessage = json.data && json.data.message ? json.data.message : 'Onbekende fout';
+						const errorMessage = json.data && json.data.message ? json.data.message : errorUnknownText;
 						throw new Error(errorMessage);
 					}
 
@@ -154,13 +181,12 @@
 						if (jsonCopyButton) {
 							jsonCopyButton.disabled = false;
 						}
-						setStatus('Structuur gegenereerd. Kopieer of vul velden in.', 'success');
+						setStatus(successText, 'success');
 					})
 				.catch((error) => {
-					const message = error && error.message ? error.message : 'Er ging iets mis bij het genereren.';
-					setStatus(loadingText, 'error');
-					const fullMessage = `${loadingText} ${message}. ${retryText}`;
-					statusField.textContent = fullMessage;
+					const message = error && error.message ? error.message : errorDefaultText;
+					const fullMessage = `${errorDefaultText} ${message}. ${retryText}`;
+					setStatus(fullMessage, 'error');
 				})
 				.finally(() => {
 					toggleLoading(false);
@@ -308,10 +334,10 @@
 		}
 
 		if (applied) {
-			setStatus(entry.label + ' ingevuld.', 'success');
+			setStatus(formatString(fieldAppliedText, [entry.label]), 'success');
 			setFieldStatus(fieldKey, 'success');
 		} else {
-			setStatus('Kon het veld niet automatisch invullen.', 'error');
+			setStatus(fieldApplyErrorText, 'error');
 			setFieldStatus(fieldKey, 'error');
 		}
 	}
@@ -340,10 +366,10 @@
 			}
 			copyToClipboard(entry.textarea.value)
 				.then(() => {
-					setStatus(entry.label + ' gekopieerd naar het klembord.', 'success');
+					setStatus(formatString(fieldCopiedText, [entry.label]), 'success');
 				})
 				.catch(() => {
-					setStatus('Kopiëren mislukt.', 'error');
+					setStatus(copyFailedText, 'error');
 				});
 		}
 
@@ -358,10 +384,10 @@
 			const text = resultField ? resultField.textContent.trim() : '';
 			copyToClipboard(text)
 				.then(() => {
-					setStatus('JSON gekopieerd naar het klembord.', 'success');
+					setStatus(jsonCopiedText, 'success');
 				})
 				.catch(() => {
-					setStatus('Kopiëren mislukt.', 'error');
+					setStatus(copyFailedText, 'error');
 				});
 		});
 	}

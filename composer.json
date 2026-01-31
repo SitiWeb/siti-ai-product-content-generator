@@ -1,0 +1,16 @@
+{
+  "name": "sitiweb/siti-ai-product-content-generator",
+  "description": "SitiAI Product Teksten WordPress plugin",
+  "type": "wordpress-plugin",
+  "require-dev": {
+    "phpunit/phpunit": "^9.6"
+  },
+  "autoload-dev": {
+    "classmap": [
+      "includes/"
+    ]
+  },
+  "scripts": {
+    "test": "phpunit"
+  }
+}
