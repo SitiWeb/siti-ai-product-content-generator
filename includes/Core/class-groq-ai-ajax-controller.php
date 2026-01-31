@@ -230,6 +230,12 @@ class Groq_AI_Ajax_Controller {
 			]
 		);
 
+		$logged_parameters = $request_parameters;
+		if ( is_array( $result ) && isset( $result['request_payload'] ) ) {
+			$logged_parameters['http_request'] = $result['request_payload'];
+			unset( $result['request_payload'] );
+		}
+
 		if ( is_wp_error( $result ) ) {
 				if ( $logger ) {
 					$logger->log_generation_event(
@@ -242,7 +248,7 @@ class Groq_AI_Ajax_Controller {
 							'status'        => 'error',
 							'error_message' => $result->get_error_message(),
 							'post_id'       => 0,
-							'parameters'    => $request_parameters,
+							'parameters'    => $logged_parameters,
 						]
 					);
 				}
@@ -272,7 +278,7 @@ class Groq_AI_Ajax_Controller {
 							'status'        => 'error',
 							'error_message' => $parsed->get_error_message(),
 							'post_id'       => 0,
-							'parameters'    => $request_parameters,
+							'parameters'    => $logged_parameters,
 						]
 					);
 				}
@@ -294,7 +300,7 @@ class Groq_AI_Ajax_Controller {
 						'usage'    => $response_usage,
 						'status'   => 'success',
 						'post_id'  => 0,
-						'parameters' => $request_parameters,
+						'parameters' => $logged_parameters,
 					]
 				);
 			}
@@ -544,6 +550,12 @@ class Groq_AI_Ajax_Controller {
 			]
 		);
 
+		$logged_parameters = $request_parameters;
+		if ( is_array( $result ) && isset( $result['request_payload'] ) ) {
+			$logged_parameters['http_request'] = $result['request_payload'];
+			unset( $result['request_payload'] );
+		}
+
 		if ( is_wp_error( $result ) ) {
 			$this->plugin->get_generation_logger()->log_generation_event(
 				[
@@ -557,7 +569,7 @@ class Groq_AI_Ajax_Controller {
 					'post_id'       => $post_id,
 					'status'        => 'error',
 					'error_message' => $result->get_error_message(),
-					'parameters'    => $request_parameters,
+					'parameters'    => $logged_parameters,
 				]
 			);
 			wp_send_json_error( [ 'message' => $result->get_error_message() ], 500 );
@@ -583,7 +595,7 @@ class Groq_AI_Ajax_Controller {
 					'post_id'       => $post_id,
 					'status'        => 'error',
 					'error_message' => $response->get_error_message(),
-					'parameters'    => $request_parameters,
+					'parameters'    => $logged_parameters,
 				]
 			);
 			wp_send_json_error( [ 'message' => $response->get_error_message() ], 500 );
@@ -598,7 +610,7 @@ class Groq_AI_Ajax_Controller {
 				'usage'    => $response_usage,
 				'post_id'  => $post_id,
 				'status'   => 'success',
-				'parameters' => $request_parameters,
+				'parameters' => $logged_parameters,
 			]
 		);
 

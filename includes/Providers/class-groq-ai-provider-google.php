@@ -231,12 +231,16 @@ class Groq_AI_Provider_Google implements Groq_AI_Provider_Interface {
 			$usage['finish_reason'] = $finish_reason;
 		}
 
-		return [
-			'content'      => $content,
-			'usage'        => $usage,
-			'raw_response' => $body,
-		];
-	}
+			return [
+				'content'      => $content,
+				'usage'        => $usage,
+				'raw_response' => $body,
+				'request_payload' => [
+					'url'  => $endpoint,
+					'body' => $payload,
+				],
+			];
+		}
 
 	private function build_safety_settings_payload( $settings ) {
 		if ( empty( $settings ) || ! is_array( $settings ) ) {

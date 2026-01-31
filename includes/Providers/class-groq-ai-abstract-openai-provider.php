@@ -100,8 +100,10 @@ abstract class Groq_AI_Abstract_OpenAI_Provider implements Groq_AI_Provider_Inte
 			$request_body['response_format'] = $args['response_format'];
 		}
 
+		$endpoint = $this->get_endpoint();
+
 		$response = wp_remote_post(
-			$this->get_endpoint(),
+			$endpoint,
 			[
 				'headers' => [
 					'Authorization' => 'Bearer ' . $api_key,
@@ -140,6 +142,10 @@ abstract class Groq_AI_Abstract_OpenAI_Provider implements Groq_AI_Provider_Inte
 			'content'      => $content,
 			'usage'        => $usage,
 			'raw_response' => $body,
+			'request_payload' => [
+				'url'    => $endpoint,
+				'body'   => $request_body,
+			],
 		];
 	}
 
