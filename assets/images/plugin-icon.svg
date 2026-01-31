@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6C38FF"/>
+      <stop offset="100%" stop-color="#00C7C7"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="48" fill="url(#g)"/>
+  <path fill="#ffffff" d="M68 176c-8.8 0-16-7.2-16-16v-64c0-8.8 7.2-16 16-16h56c8.8 0 16 7.2 16 16v12h-24v-4c0-3.3-2.7-6-6-6H84c-3.3 0-6 2.7-6 6v44c0 3.3 2.7 6 6 6h26c3.3 0 6-2.7 6-6v-4h24v12c0 8.8-7.2 16-16 16H68zm120-32h-48v-32h48v-16l32 32-32 32v-16z"/>
+  <text x="128" y="210" text-anchor="middle" font-family="'Montserrat', Arial, sans-serif" font-size="28" fill="#ffffff" opacity="0.9">SitiAI</text>
+</svg>

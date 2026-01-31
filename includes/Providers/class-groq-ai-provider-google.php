@@ -30,7 +30,7 @@ class Groq_AI_Provider_Google implements Groq_AI_Provider_Interface {
 	}
 
 	public function supports_response_format() {
-		return false;
+		return true;
 	}
 
 	public function supports_image_context() {
@@ -153,6 +153,18 @@ class Groq_AI_Provider_Google implements Groq_AI_Provider_Interface {
 		}
 		$max_tokens = max( 128, min( 8192, $max_tokens ) );
 
+		$generation_config = [
+			'temperature'     => isset( $args['temperature'] ) ? (float) $args['temperature'] : 0.7,
+			'maxOutputTokens' => $max_tokens,
+		];
+
+		$response_format = isset( $args['response_format'] ) ? $args['response_format'] : null;
+		$schema_payload  = $this->prepare_response_schema_payload( $response_format );
+		if ( ! empty( $schema_payload ) ) {
+			$generation_config['responseMimeType']   = 'application/json';
+			$generation_config['responseJsonSchema'] = $schema_payload;
+		}
+
 		$payload = [
 			'contents'         => [
 				[
@@ -160,11 +172,16 @@ class Groq_AI_Provider_Google implements Groq_AI_Provider_Interface {
 					'parts' => $parts,
 				],
 			],
-			'generationConfig' => [
-				'temperature'     => isset( $args['temperature'] ) ? (float) $args['temperature'] : 0.7,
-				'maxOutputTokens' => $max_tokens,
-			],
+			'generationConfig' => $generation_config,
 		];
+
+		$safety_settings_payload = $this->build_safety_settings_payload(
+			isset( $settings['google_safety_settings'] ) ? $settings['google_safety_settings'] : []
+		);
+
+		if ( ! empty( $safety_settings_payload ) ) {
+			$payload['safetySettings'] = $safety_settings_payload;
+		}
 
 		$response = wp_remote_post(
 			$endpoint,
@@ -204,7 +221,11 @@ class Groq_AI_Provider_Google implements Groq_AI_Provider_Interface {
 		}
 
 		$content = trim( implode( "\n\n", array_filter( $texts ) ) );
-		$usage   = isset( $body['usageMetadata'] ) && is_array( $body['usageMetadata'] ) ? $body['usageMetadata'] : [];
+		$usage_metadata = isset( $body['usageMetadata'] ) && is_array( $body['usageMetadata'] ) ? $body['usageMetadata'] : [];
+		$usage   = $usage_metadata;
+		if ( ! empty( $usage_metadata ) ) {
+			$usage = array_merge( $usage, $this->map_usage_metadata_counts( $usage_metadata ) );
+		}
 		$finish_reason = isset( $body['candidates'][0]['finishReason'] ) ? sanitize_text_field( (string) $body['candidates'][0]['finishReason'] ) : '';
 		if ( '' !== $finish_reason ) {
 			$usage['finish_reason'] = $finish_reason;
@@ -215,5 +236,113 @@ class Groq_AI_Provider_Google implements Groq_AI_Provider_Interface {
 			'usage'        => $usage,
 			'raw_response' => $body,
 		];
+	}
+
+	private function build_safety_settings_payload( $settings ) {
+		if ( empty( $settings ) || ! is_array( $settings ) ) {
+			return [];
+		}
+
+		$categories = class_exists( 'Groq_AI_Settings_Manager' ) ? array_keys( Groq_AI_Settings_Manager::get_google_safety_categories_list() ) : [];
+		$thresholds = class_exists( 'Groq_AI_Settings_Manager' ) ? array_keys( Groq_AI_Settings_Manager::get_google_safety_thresholds_list() ) : [];
+
+		if ( empty( $categories ) || empty( $thresholds ) ) {
+			return [];
+		}
+
+		$payload = [];
+		foreach ( $settings as $category => $threshold ) {
+			$category  = sanitize_text_field( (string) $category );
+			$threshold = sanitize_text_field( (string) $threshold );
+
+			if ( ! in_array( $category, $categories, true ) || ! in_array( $threshold, $thresholds, true ) ) {
+				continue;
+			}
+
+			$payload[] = [
+				'category'  => $category,
+				'threshold' => $threshold,
+			];
+		}
+
+		return $payload;
+	}
+
+	private function prepare_response_schema_payload( $response_format ) {
+		if ( empty( $response_format ) || ! is_array( $response_format ) ) {
+			return [];
+		}
+
+		if ( isset( $response_format['type'] ) && 'json_schema' === $response_format['type'] ) {
+			if ( isset( $response_format['json_schema']['schema'] ) && is_array( $response_format['json_schema']['schema'] ) ) {
+				return $this->sanitize_schema_definition( $response_format['json_schema']['schema'] );
+			}
+
+			if ( isset( $response_format['schema'] ) && is_array( $response_format['schema'] ) ) {
+				return $this->sanitize_schema_definition( $response_format['schema'] );
+			}
+		}
+
+		return [];
+	}
+
+	private function sanitize_schema_definition( $schema ) {
+		if ( ! is_array( $schema ) ) {
+			return [];
+		}
+
+		$encoded = wp_json_encode( $schema );
+		if ( ! $encoded ) {
+			return [];
+		}
+
+		$decoded = json_decode( $encoded, true );
+
+		if ( ! is_array( $decoded ) ) {
+			return [];
+		}
+
+		$this->remove_disallowed_schema_keys( $decoded );
+
+		return $decoded;
+	}
+
+	private function remove_disallowed_schema_keys( array &$schema ) {
+		$disallowed = [ 'additionalProperties' ];
+
+		foreach ( $schema as $key => &$value ) {
+			if ( in_array( $key, $disallowed, true ) ) {
+				unset( $schema[ $key ] );
+				continue;
+			}
+
+			if ( is_array( $value ) ) {
+				$this->remove_disallowed_schema_keys( $value );
+			}
+		}
+
+		unset( $value );
+	}
+
+	private function map_usage_metadata_counts( $metadata ) {
+		if ( ! is_array( $metadata ) ) {
+			return [];
+		}
+
+		$mapped = [];
+
+		if ( isset( $metadata['promptTokenCount'] ) ) {
+			$mapped['prompt_tokens'] = absint( $metadata['promptTokenCount'] );
+		}
+
+		if ( isset( $metadata['candidatesTokenCount'] ) ) {
+			$mapped['completion_tokens'] = absint( $metadata['candidatesTokenCount'] );
+		}
+
+		if ( isset( $metadata['totalTokenCount'] ) ) {
+			$mapped['total_tokens'] = absint( $metadata['totalTokenCount'] );
+		}
+
+		return $mapped;
 	}
 }

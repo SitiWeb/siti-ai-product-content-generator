@@ -47,6 +47,7 @@ class Groq_AI_Settings_Manager {
 			'google_enable_ga' => true,
 			'google_gsc_site_url' => '',
 			'google_ga4_property_id' => '',
+			'google_safety_settings' => [],
 			'context_fields' => $this->get_default_context_fields(),
 			'modules'        => $this->get_default_modules_settings(),
 			'image_context_mode' => 'url',
@@ -60,6 +61,7 @@ class Groq_AI_Settings_Manager {
 		$settings = wp_parse_args( (array) $settings, $defaults );
 		$settings['context_fields'] = $this->normalize_context_fields( isset( $settings['context_fields'] ) ? $settings['context_fields'] : [] );
 		$settings['modules']        = $this->sanitize_modules_settings( isset( $settings['modules'] ) ? $settings['modules'] : [] );
+		$settings['google_safety_settings'] = $this->sanitize_google_safety_settings( isset( $settings['google_safety_settings'] ) ? $settings['google_safety_settings'] : [] );
 		$settings['model']          = Groq_AI_Model_Exclusions::ensure_allowed( $settings['provider'], isset( $settings['model'] ) ? $settings['model'] : '' );
 
 		$image_mode = isset( $settings['image_context_mode'] ) ? sanitize_text_field( $settings['image_context_mode'] ) : 'url';
@@ -120,6 +122,7 @@ class Groq_AI_Settings_Manager {
 			'google_enable_ga' => true,
 			'google_gsc_site_url' => '',
 			'google_ga4_property_id' => '',
+			'google_safety_settings' => [],
 			'context_fields' => $this->get_default_context_fields(),
 			'modules'        => $this->get_default_modules_settings(),
 			'image_context_mode' => 'url',
@@ -193,6 +196,7 @@ class Groq_AI_Settings_Manager {
 			'google_enable_ga' => ! empty( $raw_input['google_enable_ga'] ),
 			'google_gsc_site_url' => esc_url_raw( (string) $input['google_gsc_site_url'] ),
 			'google_ga4_property_id' => sanitize_text_field( (string) $input['google_ga4_property_id'] ),
+			'google_safety_settings' => $this->sanitize_google_safety_settings( isset( $raw_input['google_safety_settings'] ) ? $raw_input['google_safety_settings'] : [] ),
 			'response_format_compat' => ! empty( $raw_input['response_format_compat'] ),
 			'image_context_mode' => $image_mode,
 			'image_context_limit' => $image_limit,
@@ -422,6 +426,94 @@ class Groq_AI_Settings_Manager {
 		return $this->sanitize_term_description_char_limit_value( $value, 1200 );
 	}
 
+	public function get_google_safety_settings( $settings = null ) {
+		if ( null === $settings ) {
+			$settings = $this->all();
+		}
+
+		return $this->sanitize_google_safety_settings( isset( $settings['google_safety_settings'] ) ? $settings['google_safety_settings'] : [] );
+	}
+
+	public function get_google_safety_categories() {
+		return self::get_google_safety_categories_list();
+	}
+
+	public function get_google_safety_thresholds() {
+		return self::get_google_safety_thresholds_list();
+	}
+
+	public function get_loggable_settings_snapshot( $settings = null ) {
+		if ( null === $settings ) {
+			$settings = $this->all();
+		}
+
+		$allowed_keys = [
+			'store_context',
+			'default_prompt',
+			'max_output_tokens',
+			'product_attribute_includes',
+			'context_fields',
+			'modules',
+			'image_context_mode',
+			'image_context_limit',
+			'response_format_compat',
+			'term_top_description_char_limit',
+			'term_bottom_description_char_limit',
+			'term_bottom_description_meta_key',
+			'google_safety_settings',
+			'google_enable_gsc',
+			'google_enable_ga',
+			'google_gsc_site_url',
+			'google_ga4_property_id',
+		];
+
+		$snapshot = [];
+
+		foreach ( $allowed_keys as $key ) {
+			if ( array_key_exists( $key, $settings ) ) {
+				$snapshot[ $key ] = $settings[ $key ];
+			}
+		}
+
+		return $snapshot;
+	}
+
+	public static function get_google_safety_categories_list() {
+		return [
+			'HARM_CATEGORY_HARASSMENT'       => [
+				'label'       => __( 'Harassment & intimidatie', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'description' => __( 'Detecteert bedreigingen en pesterijen in de output.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			],
+			'HARM_CATEGORY_HATE_SPEECH'      => [
+				'label'       => __( 'Haatspraak', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'description' => __( 'Beperkt discriminerende of denigrerende taal.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			],
+			'HARM_CATEGORY_SEXUALLY_EXPLICIT' => [
+				'label'       => __( 'Seksueel expliciet', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'description' => __( 'Filtert beschrijvingen van seksuele handelingen of fetish-content.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			],
+			'HARM_CATEGORY_DANGEROUS_CONTENT' => [
+				'label'       => __( 'Gevaarlijke activiteiten', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'description' => __( 'Voorkomt instructies rond geweld, wapens of gevaarlijke middelen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			],
+			'HARM_CATEGORY_CIVIC_INTEGRITY'   => [
+				'label'       => __( 'Civieke integriteit', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+				'description' => __( 'Vermindert desinformatie rond verkiezingen en burgerprocessen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			],
+		];
+	}
+
+	public static function get_google_safety_thresholds_list() {
+		return [
+			''                                => __( 'Google standaard (niet meesturen)', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			'HARM_BLOCK_THRESHOLD_UNSPECIFIED' => __( 'Onbekende drempel (laat Google beslissen)', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			'BLOCK_LOW_AND_ABOVE'             => __( 'Blokkeer lage ernst en hoger', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			'BLOCK_MEDIUM_AND_ABOVE'          => __( 'Blokkeer middel en hoger', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			'BLOCK_ONLY_HIGH'                 => __( 'Blokkeer alleen hoge ernst', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+			'BLOCK_NONE'                      => __( 'Sta alles toe (geen blokkade)', GROQ_AI_PRODUCT_TEXT_DOMAIN ),
+		];
+	}
+
 	public function is_response_format_compat_enabled( $settings = null ) {
 		if ( null === $settings ) {
 			$settings = $this->all();
@@ -504,5 +596,28 @@ class Groq_AI_Settings_Manager {
 		}
 
 		return min( 10, $limit );
+	}
+
+	private function sanitize_google_safety_settings( $settings ) {
+		if ( ! is_array( $settings ) ) {
+			return [];
+		}
+
+		$categories = array_keys( self::get_google_safety_categories_list() );
+		$thresholds = array_keys( self::get_google_safety_thresholds_list() );
+		$clean      = [];
+
+		foreach ( $settings as $category => $threshold ) {
+			$category  = sanitize_text_field( (string) $category );
+			$threshold = sanitize_text_field( (string) $threshold );
+
+			if ( '' === $threshold || ! in_array( $category, $categories, true ) || ! in_array( $threshold, $thresholds, true ) ) {
+				continue;
+			}
+
+			$clean[ $category ] = $threshold;
+		}
+
+		return $clean;
 	}
 }

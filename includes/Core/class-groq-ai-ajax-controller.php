@@ -198,7 +198,26 @@ class Groq_AI_Ajax_Controller {
 			$final_prompt = $prompt_builder->append_response_instructions( $prompt_with_context, $settings );
 		}
 
+		$request_parameters = $this->build_request_parameters_snapshot(
+			$settings,
+			[
+				'provider'                 => $provider_key,
+				'conversation_id'          => $conversation_id,
+				'temperature'              => 0.7,
+				'response_format_mode'     => $use_response_format ? 'structured' : 'prompt',
+				'response_format_definition' => $response_format,
+				'term_context'             => [
+					'term_id'  => $term_id,
+					'taxonomy' => $taxonomy,
+				],
+				'term_options'             => $usage_meta['term_options'],
+				'origin'                   => $origin,
+				'google_safety_settings'   => isset( $settings['google_safety_settings'] ) ? $settings['google_safety_settings'] : [],
+			]
+		);
+
 		$model  = $this->plugin->get_selected_model( $provider, $settings );
+		$request_parameters['model'] = $model;
 		$result = $provider->generate_content(
 			[
 				'prompt'          => $final_prompt,
@@ -212,20 +231,21 @@ class Groq_AI_Ajax_Controller {
 		);
 
 		if ( is_wp_error( $result ) ) {
-			if ( $logger ) {
-				$logger->log_generation_event(
-					[
-						'provider'      => $provider_key,
-						'model'         => $model,
-						'prompt'        => $final_prompt,
-						'response'      => '',
-						'usage'         => $usage_meta,
-						'status'        => 'error',
-						'error_message' => $result->get_error_message(),
-						'post_id'       => 0,
-					]
-				);
-			}
+				if ( $logger ) {
+					$logger->log_generation_event(
+						[
+							'provider'      => $provider_key,
+							'model'         => $model,
+							'prompt'        => $final_prompt,
+							'response'      => '',
+							'usage'         => $usage_meta,
+							'status'        => 'error',
+							'error_message' => $result->get_error_message(),
+							'post_id'       => 0,
+							'parameters'    => $request_parameters,
+						]
+					);
+				}
 			return $result;
 		}
 
@@ -241,20 +261,21 @@ class Groq_AI_Ajax_Controller {
 			$parsed = $prompt_builder->parse_term_structured_response( $response_text, $settings );
 		}
 		if ( is_wp_error( $parsed ) ) {
-			if ( $logger ) {
-				$logger->log_generation_event(
-					[
-						'provider'      => $provider_key,
-						'model'         => $model,
-						'prompt'        => $final_prompt,
-						'response'      => $response_text,
-						'usage'         => $response_usage,
-						'status'        => 'error',
-						'error_message' => $parsed->get_error_message(),
-						'post_id'       => 0,
-					]
-				);
-			}
+				if ( $logger ) {
+					$logger->log_generation_event(
+						[
+							'provider'      => $provider_key,
+							'model'         => $model,
+							'prompt'        => $final_prompt,
+							'response'      => $response_text,
+							'usage'         => $response_usage,
+							'status'        => 'error',
+							'error_message' => $parsed->get_error_message(),
+							'post_id'       => 0,
+							'parameters'    => $request_parameters,
+						]
+					);
+				}
 			return $parsed;
 		}
 		if ( ! is_array( $parsed ) ) {
@@ -263,19 +284,20 @@ class Groq_AI_Ajax_Controller {
 			];
 		}
 
-		if ( $logger ) {
-			$logger->log_generation_event(
-				[
-					'provider' => $provider_key,
-					'model'    => $model,
-					'prompt'   => $final_prompt,
-					'response' => $response_text,
-					'usage'    => $response_usage,
-					'status'   => 'success',
-					'post_id'  => 0,
-				]
-			);
-		}
+			if ( $logger ) {
+				$logger->log_generation_event(
+					[
+						'provider' => $provider_key,
+						'model'    => $model,
+						'prompt'   => $final_prompt,
+						'response' => $response_text,
+						'usage'    => $response_usage,
+						'status'   => 'success',
+						'post_id'  => 0,
+						'parameters' => $request_parameters,
+					]
+				);
+			}
 
 		return [
 			'top_description'    => isset( $parsed['top_description'] ) ? $parsed['top_description'] : ( isset( $parsed['description'] ) ? $parsed['description'] : '' ),
@@ -492,6 +514,23 @@ class Groq_AI_Ajax_Controller {
 			$final_prompt = $prompt_builder->append_response_instructions( $prompt_with_context, $settings );
 		}
 
+		$request_parameters = $this->build_request_parameters_snapshot(
+			$settings,
+			[
+				'provider'                 => $provider_key,
+				'model'                    => $model,
+				'post_id'                  => $post_id,
+				'conversation_id'          => $conversation_id,
+				'temperature'              => 0.7,
+				'response_format_mode'     => $use_response_format ? 'structured' : 'prompt',
+				'response_format_definition' => $response_format,
+				'context_fields'           => $context_fields,
+				'attribute_includes'       => isset( $settings['product_attribute_includes'] ) ? $settings['product_attribute_includes'] : [],
+				'image_context'            => $image_context_meta,
+				'google_safety_settings'   => isset( $settings['google_safety_settings'] ) ? $settings['google_safety_settings'] : [],
+			]
+		);
+
 		$result = $provider->generate_content(
 			[
 				'prompt'          => $final_prompt,
@@ -518,6 +557,7 @@ class Groq_AI_Ajax_Controller {
 					'post_id'       => $post_id,
 					'status'        => 'error',
 					'error_message' => $result->get_error_message(),
+					'parameters'    => $request_parameters,
 				]
 			);
 			wp_send_json_error( [ 'message' => $result->get_error_message() ], 500 );
@@ -543,6 +583,7 @@ class Groq_AI_Ajax_Controller {
 					'post_id'       => $post_id,
 					'status'        => 'error',
 					'error_message' => $response->get_error_message(),
+					'parameters'    => $request_parameters,
 				]
 			);
 			wp_send_json_error( [ 'message' => $response->get_error_message() ], 500 );
@@ -557,6 +598,7 @@ class Groq_AI_Ajax_Controller {
 				'usage'    => $response_usage,
 				'post_id'  => $post_id,
 				'status'   => 'success',
+				'parameters' => $request_parameters,
 			]
 		);
 
@@ -606,5 +648,17 @@ class Groq_AI_Ajax_Controller {
 		}
 
 		return (string) $result;
+	}
+
+	private function build_request_parameters_snapshot( $settings, array $additional = [] ) {
+		$snapshot = [
+			'settings' => $this->plugin->get_loggable_settings_snapshot( $settings ),
+		];
+
+		foreach ( $additional as $key => $value ) {
+			$snapshot[ $key ] = $value;
+		}
+
+		return $snapshot;
 	}
 }

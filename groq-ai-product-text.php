@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SitiAI Product Teksten
  * Description: Genereer productteksten met diverse AI-aanbieders rechtstreeks vanuit WooCommerce.
- * Version: 1.7.0
+ * Version: 1.8.0
  * Author: SitiAI
  * Text Domain: siti-ai-product-content-generator
  * Domain Path: /languages
@@ -348,6 +348,22 @@ final class Groq_AI_Product_Text_Plugin {
 
 	public function get_term_bottom_description_char_limit( $settings = null ) {
 		return $this->get_settings_manager()->get_term_bottom_description_char_limit( $settings );
+	}
+
+	public function get_google_safety_settings( $settings = null ) {
+		return $this->get_settings_manager()->get_google_safety_settings( $settings );
+	}
+
+	public function get_google_safety_categories() {
+		return $this->get_settings_manager()->get_google_safety_categories();
+	}
+
+	public function get_google_safety_thresholds() {
+		return $this->get_settings_manager()->get_google_safety_thresholds();
+	}
+
+	public function get_loggable_settings_snapshot( $settings = null ) {
+		return $this->get_settings_manager()->get_loggable_settings_snapshot( $settings );
 	}
 
 	public function should_use_response_format( Groq_AI_Provider_Interface $provider, $settings ) {

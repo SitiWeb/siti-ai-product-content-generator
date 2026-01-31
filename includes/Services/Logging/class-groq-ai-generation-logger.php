@@ -26,9 +26,32 @@ class Groq_AI_Generation_Logger {
 		$table = $this->get_logs_table_name();
 
 		$usage             = isset( $args['usage'] ) && is_array( $args['usage'] ) ? $args['usage'] : [];
-		$prompt_tokens     = isset( $usage['prompt_tokens'] ) ? absint( $usage['prompt_tokens'] ) : null;
-		$completion_tokens = isset( $usage['completion_tokens'] ) ? absint( $usage['completion_tokens'] ) : null;
-		$total_tokens      = isset( $usage['total_tokens'] ) ? absint( $usage['total_tokens'] ) : null;
+		$parameters        = isset( $args['parameters'] ) && is_array( $args['parameters'] ) ? $args['parameters'] : [];
+		$prompt_tokens     = $this->extract_usage_token_value(
+			$usage,
+			[
+				'prompt_tokens',
+				'promptTokenCount',
+				'input_tokens',
+				'inputTokenCount',
+			]
+		);
+		$completion_tokens = $this->extract_usage_token_value(
+			$usage,
+			[
+				'completion_tokens',
+				'output_tokens',
+				'candidatesTokenCount',
+				'outputTokenCount',
+			]
+		);
+		$total_tokens      = $this->extract_usage_token_value(
+			$usage,
+			[
+				'total_tokens',
+				'totalTokenCount',
+			]
+		);
 
 		$wpdb->insert(
 			$table,
@@ -46,6 +69,7 @@ class Groq_AI_Generation_Logger {
 				'status'            => isset( $args['status'] ) ? sanitize_text_field( $args['status'] ) : 'success',
 				'error_message'     => isset( $args['error_message'] ) ? $args['error_message'] : '',
 				'usage_json'        => ! empty( $usage ) ? wp_json_encode( $usage ) : null,
+				'request_json'      => ! empty( $parameters ) ? wp_json_encode( $parameters ) : null,
 			]
 		);
 	}
@@ -77,6 +101,7 @@ class Groq_AI_Generation_Logger {
 	public function maybe_create_table() {
 		if ( get_option( self::OPTION_TABLE_CREATED ) ) {
 			$this->logs_table_exists = true;
+			$this->maybe_upgrade_table_schema();
 			return;
 		}
 
@@ -106,6 +131,7 @@ class Groq_AI_Generation_Logger {
 			status varchar(20) NOT NULL,
 			error_message text DEFAULT NULL,
 			usage_json longtext DEFAULT NULL,
+			request_json longtext DEFAULT NULL,
 			PRIMARY KEY  (id),
 			KEY provider (provider),
 			KEY post_id (post_id)
@@ -115,6 +141,26 @@ class Groq_AI_Generation_Logger {
 
 		$this->logs_table_exists = true;
 		update_option( self::OPTION_TABLE_CREATED, 1 );
+	}
+
+	private function extract_usage_token_value( $usage, $keys ) {
+		foreach ( (array) $keys as $key ) {
+			if ( isset( $usage[ $key ] ) ) {
+				return absint( $usage[ $key ] );
+			}
+		}
+
+		return null;
+	}
+
+	private function maybe_upgrade_table_schema() {
+		global $wpdb;
+
+		$table = $this->get_logs_table_name();
+		$column = $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$table} LIKE %s", 'request_json' ) );
+		if ( ! $column ) {
+			$this->create_table();
+		}
 	}
 
 	private function get_logs_table_name() {

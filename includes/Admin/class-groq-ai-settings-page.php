@@ -217,6 +217,9 @@ class Groq_AI_Product_Text_Settings_Page {
 		$google_connected_email = isset( $settings['google_oauth_connected_email'] ) ? (string) $settings['google_oauth_connected_email'] : '';
 		$google_connected_at    = isset( $settings['google_oauth_connected_at'] ) ? absint( $settings['google_oauth_connected_at'] ) : 0;
 		$oauth_redirect         = add_query_arg( 'action', 'groq_ai_google_oauth_callback', admin_url( 'admin-post.php' ) );
+		$google_safety_settings = $this->plugin->get_google_safety_settings( $settings );
+		$google_safety_categories = $this->plugin->get_google_safety_categories();
+		$google_safety_thresholds = $this->plugin->get_google_safety_thresholds();
 
 		?>
 		<div class="wrap">
@@ -281,6 +284,30 @@ class Groq_AI_Product_Text_Settings_Page {
 							<td>
 								<input type="password" id="groq-ai-api-<?php echo esc_attr( $provider_key ); ?>" class="regular-text" name="<?php echo esc_attr( $option_key ); ?>[<?php echo esc_attr( $option_field ); ?>]" value="<?php echo esc_attr( $value ); ?>" autocomplete="off" />
 								<p class="description"><?php printf( esc_html__( 'Voer de API-sleutel in voor %s.', GROQ_AI_PRODUCT_TEXT_DOMAIN ), esc_html( $provider->get_label() ) ); ?></p>
+								<?php if ( 'google' === $provider_key && ! empty( $google_safety_categories ) ) : ?>
+									<div class="groq-ai-google-safety-settings" style="margin-top:16px; padding:16px; border:1px solid #dcdcde; background:#f6f7f7;">
+										<strong><?php esc_html_e( 'Gemini safety filters', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></strong>
+										<p class="description" style="margin-top:4px;"><?php esc_html_e( 'Kies optioneel welke beleidscategorieën je zelf instelt. Laat op "Google standaard" om geen safetySettings mee te sturen.', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></p>
+										<?php foreach ( $google_safety_categories as $category_key => $info ) :
+											$category_label = isset( $info['label'] ) ? $info['label'] : $category_key;
+											$category_description = isset( $info['description'] ) ? $info['description'] : '';
+											$selected_threshold = isset( $google_safety_settings[ $category_key ] ) ? $google_safety_settings[ $category_key ] : '';
+											$field_id = 'groq-ai-google-safety-' . sanitize_html_class( $category_key );
+											?>
+											<label for="<?php echo esc_attr( $field_id ); ?>" style="display:block; margin:12px 0 4px;">
+												<span style="display:block; margin-bottom:4px;"><strong><?php echo esc_html( $category_label ); ?></strong></span>
+												<select id="<?php echo esc_attr( $field_id ); ?>" name="<?php echo esc_attr( $option_key ); ?>[google_safety_settings][<?php echo esc_attr( $category_key ); ?>]" style="max-width:280px;">
+													<?php foreach ( $google_safety_thresholds as $threshold_key => $threshold_label ) : ?>
+														<option value="<?php echo esc_attr( $threshold_key ); ?>" <?php selected( $selected_threshold, $threshold_key ); ?>><?php echo esc_html( $threshold_label ); ?></option>
+													<?php endforeach; ?>
+												</select>
+												<?php if ( '' !== $category_description ) : ?>
+													<p class="description" style="margin:4px 0 0;"><?php echo esc_html( $category_description ); ?></p>
+												<?php endif; ?>
+											</label>
+										<?php endforeach; ?>
+									</div>
+								<?php endif; ?>
 							</td>
 						</tr>
 					<?php endforeach; ?>
@@ -892,6 +919,34 @@ class Groq_AI_Product_Text_Settings_Page {
 
 				<h2><?php esc_html_e( 'AI-respons', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
 				<pre style="background:#f9f9f9;border:1px solid #dcdcde;padding:12px;white-space:pre-wrap;"><?php echo esc_html( $log['response'] ); ?></pre>
+
+				<?php
+				$request_params = [];
+				if ( ! empty( $log['request_json'] ) ) {
+					$request_params = json_decode( $log['request_json'], true );
+					$request_params = is_array( $request_params ) ? $request_params : [];
+				}
+				if ( ! empty( $request_params ) ) :
+					$request_pretty = wp_json_encode( $request_params, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+					$request_pretty = $request_pretty ? $request_pretty : wp_json_encode( $request_params );
+					?>
+					<h2><?php esc_html_e( 'Request parameters', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
+					<pre style="background:#fff;border:1px solid #dcdcde;padding:12px;white-space:pre-wrap;"><?php echo esc_html( $request_pretty ); ?></pre>
+				<?php endif; ?>
+
+				<?php
+				$usage_meta = [];
+				if ( ! empty( $log['usage_json'] ) ) {
+					$usage_meta = json_decode( $log['usage_json'], true );
+					$usage_meta = is_array( $usage_meta ) ? $usage_meta : [];
+				}
+				if ( ! empty( $usage_meta ) ) :
+					$usage_pretty = wp_json_encode( $usage_meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+					$usage_pretty = $usage_pretty ? $usage_pretty : wp_json_encode( $usage_meta );
+					?>
+					<h2><?php esc_html_e( 'Usage metadata', GROQ_AI_PRODUCT_TEXT_DOMAIN ); ?></h2>
+					<pre style="background:#f6f7f7;border:1px solid #dcdcde;padding:12px;white-space:pre-wrap;"><?php echo esc_html( $usage_pretty ); ?></pre>
+				<?php endif; ?>
 			<?php endif; ?>
 		</div>
 		<?php

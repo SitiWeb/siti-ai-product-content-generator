@@ -119,7 +119,8 @@ class SitiWebUpdater {
 						'url' => $this->plugin["PluginURI"],
 						'slug' => $slug,
 						'package' => $new_files,
-						'new_version' => $latest_version
+						'new_version' => $latest_version,
+						'icons' => $this->prepare_icon_set(),
 					);
 
 					$transient->response[$this->basename] = (object) $plugin; // Return it in response
@@ -160,10 +161,11 @@ class SitiWebUpdater {
 					'homepage'			=> $this->plugin["PluginURI"],
 					'short_description' => $this->plugin["Description"],
 					'sections'			=> array(
-						'Description'	=> $this->plugin["Description"],
-						'Updates'		=> $this->github_response['body'],
+						'description'	=> wp_kses_post( wpautop( $this->plugin["Description"] ) ),
+						'changelog'		=> $this->get_release_notes_html(),
 					),
-					'download_link'		=> $this->github_response['zipball_url']
+					'download_link'		=> $this->github_response['zipball_url'],
+					'icons'            => $this->prepare_icon_set(),
 				);
 
 				return (object) $plugin; // Return the data
@@ -198,5 +200,38 @@ class SitiWebUpdater {
 		}
 
 		return $result;
+	}
+
+	private function get_release_notes_html() {
+		$notes = isset( $this->github_response['body'] ) ? (string) $this->github_response['body'] : '';
+
+		if ( '' === trim( $notes ) ) {
+			return __( 'Nog geen changelog beschikbaar.', 'siti-ai-product-content-generator' );
+		}
+
+		return wp_kses_post( wpautop( $notes ) );
+	}
+
+	private function get_plugin_icon_url() {
+		$file = plugin_dir_path( $this->file ) . 'assets/images/plugin-icon.svg';
+		if ( ! file_exists( $file ) ) {
+			return '';
+		}
+
+		return plugins_url( 'assets/images/plugin-icon.svg', $this->file );
+	}
+
+	private function prepare_icon_set() {
+		$icon_url = $this->get_plugin_icon_url();
+		if ( '' === $icon_url ) {
+			return array();
+		}
+
+		return array(
+			'1x'      => $icon_url,
+			'2x'      => $icon_url,
+			'svg'     => $icon_url,
+			'default' => $icon_url,
+		);
 	}
 }
