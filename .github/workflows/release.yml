@@ -38,6 +38,36 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+      - name: Genereer manifest.json uit plugin header
+        run: |
+          python3 - <<'PY'
+          import json
+          import re
+
+          with open('groq-ai-product-text.php', 'r', encoding='utf-8') as handle:
+            content = handle.read()
+
+          header_match = re.search(r'/\*\*(.*?)\*/', content, re.S)
+          header = header_match.group(1) if header_match else ''
+
+          def read_field(label: str) -> str:
+            match = re.search(r'^\s*\*\s*' + re.escape(label) + r'\s*:\s*(.+)$', header, re.M)
+            return match.group(1).strip() if match else ''
+
+          manifest = {
+            'plugin_name': read_field('Plugin Name'),
+            'description': read_field('Description'),
+            'version': read_field('Version'),
+            'author': read_field('Author'),
+            'author_url': read_field('Author URI'),
+          }
+
+          with open('manifest.json', 'w', encoding='utf-8') as handle:
+            json.dump(manifest, handle, ensure_ascii=False, indent=2)
+
+          print('manifest.json aangemaakt/bijgewerkt')
+          PY
+
       - name: Check if tag exists
         id: tagcheck
         run: |
