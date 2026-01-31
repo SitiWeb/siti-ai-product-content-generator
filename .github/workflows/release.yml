@@ -68,6 +68,19 @@ jobs:
           print('manifest.json aangemaakt/bijgewerkt')
           PY
 
+      - name: Commit & push manifest.json
+        run: |
+          if git diff --quiet -- manifest.json; then
+            echo "manifest.json ongewijzigd; geen commit nodig."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "chore: update manifest.json"
+          git push
+
       - name: Check if tag exists
         id: tagcheck
         run: |
