@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SitiAI Product Teksten
  * Description: Genereer productteksten met diverse AI-aanbieders rechtstreeks vanuit WooCommerce.
- * Version: 1.9.0
+ * Version: 1.9.1
  * Author: Roberto Guagliardo | SitiWeb
  * Author URI: https://sitiweb.nl/
  * Text Domain: siti-ai-product-content-generator
@@ -79,6 +79,7 @@ if( ! class_exists( 'SitiWebUpdater' ) ){
 $updater = new SitiWebUpdater( __FILE__ );
 $updater->set_username( 'SitiWeb' );
 $updater->set_repository( 'siti-ai-product-content-generator' );
+$updater->set_api_base_url( 'https://git.robert.ooo/api/v1' );
 $updater->initialize();
 
 

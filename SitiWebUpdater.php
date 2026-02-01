@@ -16,11 +16,20 @@ class SitiWebUpdater {
 
 	private $authorize_token;
 
+	private $api_base_url;
+
+	private $auth_header_scheme;
+
+	private $download_auth_header_scheme;
+
 	private $github_response;
 
 	public function __construct( $file ) {
 
 		$this->file = $file;
+		$this->api_base_url = 'https://api.github.com';
+		$this->auth_header_scheme = 'bearer';
+		$this->download_auth_header_scheme = 'token';
 
 		$this->set_plugin_properties();
 		add_action( 'admin_init', array( $this, 'set_plugin_properties' ) );
@@ -50,15 +59,29 @@ class SitiWebUpdater {
 		$this->authorize_token = $token;
 	}
 
+	public function set_api_base_url( $api_base_url ) {
+		$this->api_base_url = rtrim( (string) $api_base_url, '/' );
+	}
+
+	public function set_auth_header_scheme( $scheme ) {
+		$this->auth_header_scheme = (string) $scheme;
+	}
+
+	public function set_download_auth_header_scheme( $scheme ) {
+		$this->download_auth_header_scheme = (string) $scheme;
+	}
+
 	private function get_repository_info() {
 	    if ( is_null( $this->github_response ) ) { // Do we have a response?
 		$args = array();
-	        $request_uri = sprintf( 'https://api.github.com/repos/%s/%s/releases', $this->username, $this->repository ); // Build URI
+		$request_uri = sprintf( '%s/repos/%s/%s/releases', $this->api_base_url, $this->username, $this->repository ); // Build URI
 		    
 		$args = array();
 
 	        if( $this->authorize_token ) { // Is there an access token?
-		          $args['headers']['Authorization'] = "bearer {$this->authorize_token}"; // Set the headers
+			$scheme = trim( $this->auth_header_scheme );
+			$scheme = '' === $scheme ? 'bearer' : $scheme;
+			$args['headers']['Authorization'] = $scheme . ' ' . $this->authorize_token; // Set the headers
 	        }
 
 	        $response = json_decode( wp_remote_retrieve_body( wp_remote_get( $request_uri, $args ) ), true ); // Get JSON and parse it
@@ -179,7 +202,9 @@ class SitiWebUpdater {
 
 		if ( null !== $args['filename'] ) {
 			if( $this->authorize_token ) { 
-				$args = array_merge( $args, array( "headers" => array( "Authorization" => "token {$this->authorize_token}" ) ) );
+				$scheme = trim( $this->download_auth_header_scheme );
+				$scheme = '' === $scheme ? 'token' : $scheme;
+				$args = array_merge( $args, array( "headers" => array( "Authorization" => $scheme . ' ' . $this->authorize_token ) ) );
 			}
 		}
 		
